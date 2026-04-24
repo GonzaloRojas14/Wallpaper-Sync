@@ -156,33 +156,35 @@ class GridView: NSView {
 
     func layoutCards() {
         let availWidth = bounds.width - Theme.pad * 2
-        // Dynamic columns: fit as many as possible with min card width 220
-        let cols = max(1, Int(availWidth / (220 + Theme.gap)))
+        // Dynamic columns: tighter min width
+        let cols = max(2, Int(availWidth / (190 + Theme.gap)))
         let cardW = (availWidth - CGFloat(cols - 1) * Theme.gap) / CGFloat(cols)
-        let thumbH = cardW * 0.6
-        let cardH = thumbH + 30
+        let thumbH = cardW * 0.58
+        let cardH = thumbH + 28
 
-        var startY: CGFloat = Theme.pad
-        // Account for banner
-        if let banner = bannerView {
-            banner.frame = NSRect(x: Theme.pad, y: Theme.pad, width: availWidth, height: banner.frame.height)
-            startY = banner.frame.maxY + Theme.gap
-        }
+        var y: CGFloat = Theme.pad
 
         for (i, card) in cards.enumerated() {
             let col = i % cols
             let row = i / cols
             let x = Theme.pad + CGFloat(col) * (cardW + Theme.gap)
-            let y = startY + CGFloat(row) * (cardH + Theme.gap)
-            card.frame = NSRect(x: x, y: y, width: cardW, height: cardH)
+            let cy = y + CGFloat(row) * (cardH + Theme.gap)
+            card.frame = NSRect(x: x, y: cy, width: cardW, height: cardH)
 
             // Update thumb height inside card
             card.thumbHeight = thumbH
             card.needsLayout = true
         }
+
         let rows = cards.isEmpty ? 0 : (cards.count - 1) / cols + 1
-        let contentH = startY + CGFloat(rows) * (cardH + Theme.gap) + Theme.pad
-        frame.size.height = max(contentH, superview?.bounds.height ?? 0)
+        y += CGFloat(rows) * (cardH + Theme.gap)
+
+        if let banner = bannerView {
+            banner.frame = NSRect(x: Theme.pad, y: y + 4, width: availWidth, height: 130)
+            y += 142
+        }
+
+        frame.size.height = max(y + Theme.pad, superview?.bounds.height ?? 0)
     }
 
     override func resizeSubviews(withOldSize oldSize: NSSize) {
@@ -209,37 +211,62 @@ class MainController: NSObject {
         Bundle.main.resourceURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     }()
 
+    private let statusDot = NSView()
+    private let statusLabel = NSTextField(labelWithString: "")
+    private let activeInfoLabel = NSTextField(labelWithString: "")
+
     override init() {
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 820, height: 560),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 880, height: 620),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
         super.init()
 
         window.title = "Wallpaper Sync"
-        window.minSize = NSSize(width: 560, height: 400)
+        window.minSize = NSSize(width: 560, height: 420)
         window.center()
         window.isReleasedWhenClosed = false
-        window.backgroundColor = Theme.bg
         window.titlebarAppearsTransparent = true
         window.appearance = NSAppearance(named: .darkAqua)
         window.collectionBehavior = [.fullScreenPrimary]
 
-        let contentView = NSView(frame: window.contentView!.bounds)
-        contentView.wantsLayer = true
-        contentView.layer?.backgroundColor = Theme.bg.cgColor
-        window.contentView = contentView
+        let cv = window.contentView!
+        cv.wantsLayer = true
 
-        // Header
-        let header = NSView(frame: NSRect(x: 0, y: contentView.bounds.height - 60, width: contentView.bounds.width, height: 60))
+        // Gradient background
+        let grad = CAGradientLayer()
+        grad.colors = [
+            NSColor(red: 0.06, green: 0.05, blue: 0.13, alpha: 1).cgColor,
+            NSColor(red: 0.10, green: 0.08, blue: 0.19, alpha: 1).cgColor,
+            NSColor(red: 0.07, green: 0.06, blue: 0.15, alpha: 1).cgColor,
+        ]
+        grad.startPoint = CGPoint(x: 0, y: 1)
+        grad.endPoint = CGPoint(x: 1, y: 0)
+        grad.frame = cv.bounds
+        grad.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        cv.layer = CALayer()
+        cv.wantsLayer = true
+        cv.layer?.addSublayer(grad)
+
+        // Glow orbs for depth
+        let orbData: [(NSColor, CGFloat, CGFloat, CGFloat)] = [
+            (NSColor(red:0.40,green:0.20,blue:0.85,alpha:0.10), -60, -30, 450),
+            (NSColor(red:0.75,green:0.15,blue:0.45,alpha:0.06), 600, 250, 500),
+            (NSColor(red:0.15,green:0.50,blue:0.90,alpha:0.07), 250, -60, 380),
+        ]
+        for (c, ox, oy, s) in orbData {
+            let orb = CAGradientLayer()
+            orb.type = .radial
+            orb.colors = [c.cgColor, NSColor.clear.cgColor]
+            orb.frame = CGRect(x: ox, y: oy, width: s, height: s)
+            orb.startPoint = CGPoint(x: 0.5, y: 0.5)
+            orb.endPoint = CGPoint(x: 1, y: 1)
+            grad.addSublayer(orb)
+        }
+
+        // Header — just import button, title is in native title bar
+        let header = NSView(frame: NSRect(x: 0, y: cv.bounds.height - 48, width: cv.bounds.width, height: 48))
         header.autoresizingMask = [.width, .minYMargin]
-        header.wantsLayer = true
-        contentView.addSubview(header)
-
-        let title = NSTextField(labelWithString: "🎬 Wallpaper Sync")
-        title.font = NSFont.systemFont(ofSize: 22, weight: .bold)
-        title.textColor = Theme.textPri
-        title.frame = NSRect(x: Theme.pad, y: 14, width: 300, height: 30)
-        header.addSubview(title)
+        cv.addSubview(header)
 
         let importBtn = NSButton(title: "＋ Importar", target: self, action: #selector(importVideo))
         importBtn.bezelStyle = .rounded
@@ -247,20 +274,44 @@ class MainController: NSObject {
         importBtn.layer?.backgroundColor = Theme.accent.cgColor
         importBtn.layer?.cornerRadius = 8
         importBtn.contentTintColor = .white
-        importBtn.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        importBtn.frame = NSRect(x: contentView.bounds.width - 130, y: 14, width: 110, height: 32)
+        importBtn.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        importBtn.frame = NSRect(x: cv.bounds.width - 130, y: 10, width: 110, height: 28)
         importBtn.autoresizingMask = [.minXMargin]
         header.addSubview(importBtn)
 
+        // Bottom status bar
+        let bottomBar = NSView(frame: NSRect(x: 0, y: 0, width: cv.bounds.width, height: 32))
+        bottomBar.wantsLayer = true
+        bottomBar.layer?.backgroundColor = NSColor(white: 0, alpha: 0.3).cgColor
+        bottomBar.autoresizingMask = [.width]
+        cv.addSubview(bottomBar)
+
+        statusDot.wantsLayer = true
+        statusDot.layer?.cornerRadius = 4
+        statusDot.frame = NSRect(x: 12, y: 10, width: 8, height: 8)
+        bottomBar.addSubview(statusDot)
+
+        statusLabel.font = NSFont.systemFont(ofSize: 10.5, weight: .medium)
+        statusLabel.textColor = Theme.textSec
+        statusLabel.frame = NSRect(x: 26, y: 6, width: 120, height: 16)
+        bottomBar.addSubview(statusLabel)
+
+        activeInfoLabel.font = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
+        activeInfoLabel.textColor = NSColor(white: 1, alpha: 0.4)
+        activeInfoLabel.alignment = .center
+        activeInfoLabel.frame = NSRect(x: 150, y: 6, width: cv.bounds.width - 180, height: 16)
+        activeInfoLabel.autoresizingMask = [.width]
+        bottomBar.addSubview(activeInfoLabel)
+
         // Scroll + Grid
-        scrollView.frame = NSRect(x: 0, y: 0, width: contentView.bounds.width, height: contentView.bounds.height - 60)
+        scrollView.frame = NSRect(x: 0, y: 32, width: cv.bounds.width, height: cv.bounds.height - 48 - 32)
         scrollView.autoresizingMask = [.width, .height]
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = false
-        scrollView.backgroundColor = .clear
-        gridView.frame = scrollView.bounds
+        scrollView.scrollerStyle = .overlay
+        gridView.frame = NSRect(x: 0, y: 0, width: scrollView.bounds.width, height: 800)
         scrollView.documentView = gridView
-        contentView.addSubview(scrollView)
+        cv.addSubview(scrollView)
 
         reloadLibrary()
     }
@@ -280,55 +331,39 @@ class MainController: NSObject {
         gridView.bannerView?.removeFromSuperview()
         gridView.bannerView = nil
 
-        // Check if aerial is set up
-        let aerialsDir = NSString(string: "~/Library/Application Support/com.apple.wallpaper/aerials/videos").expandingTildeInPath
-        var hasAerial = false
-        if let files = try? FileManager.default.contentsOfDirectory(atPath: aerialsDir) {
-            hasAerial = files.contains(where: { $0.hasSuffix(".mov") && !$0.contains("backup") && !$0.contains("tmp") })
-        }
-
-        if !hasAerial {
-            let banner = makeBanner(
-                icon: "⚠️",
-                title: "Configuración necesaria para la pantalla de bloqueo",
-                body: """
-                Para que tu wallpaper aparezca también en la pantalla de bloqueo, \
-                necesitás descargar un fondo animado del sistema:
-
-                1. Abrí Configuración del Sistema → Fondo de Pantalla
-                2. Buscá un fondo animado (ej: "Tahoe Day")
-                3. Hacé click en "Descargar" (ícono de nube ☁️)
-                4. Activá "Mostrar como salvapantallas"
-                5. ¡Listo! Wallpaper Sync lo reemplaza automáticamente.
-
-                Esto se hace una sola vez.
-                """,
-                buttonTitle: "Abrir Configuración",
-                action: #selector(openWallpaperSettings)
-            )
-            gridView.bannerView = banner
-            gridView.addSubview(banner)
-        }
-
-        // Load videos
         let libPath = appSupportURL.appendingPathComponent("library").path
-        guard let files = try? FileManager.default.contentsOfDirectory(atPath: libPath) else { return }
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: libPath)) ?? []
         let movFiles = files.filter { $0.hasSuffix(".mov") }.sorted()
 
-        if movFiles.isEmpty {
-            let emptyBanner = makeBanner(
-                icon: "🎬",
-                title: "Tu biblioteca está vacía",
-                body: "Importá un video (.mp4, .mov, .gif) para usarlo como wallpaper animado.",
-                buttonTitle: "＋ Importar Video",
-                action: #selector(importVideo)
-            )
-            if gridView.bannerView == nil {
-                gridView.bannerView = emptyBanner
-                gridView.addSubview(emptyBanner)
+        // Engine status in bottom bar
+        let engineRunning = (try? String(contentsOfFile: appSupportURL.appendingPathComponent("logs/engine.pid").path))
+            .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            .map { kill(Int32($0), 0) == 0 } ?? false
+        statusDot.layer?.backgroundColor = engineRunning
+            ? NSColor(red: 0.3, green: 0.9, blue: 0.5, alpha: 1).cgColor
+            : NSColor(red: 0.9, green: 0.3, blue: 0.3, alpha: 1).cgColor
+        statusLabel.stringValue = engineRunning ? "Motor activo" : "Motor detenido"
+
+        // Active video info in bottom bar
+        if !activeName.isEmpty {
+            let vp = (libPath as NSString).appendingPathComponent(activeName + ".mov")
+            if FileManager.default.fileExists(atPath: vp) {
+                DispatchQueue.global(qos: .utility).async { [weak self] in
+                    let asset = AVURLAsset(url: URL(fileURLWithPath: vp))
+                    let tracks = asset.tracks(withMediaType: .video)
+                    let sz = tracks.first?.naturalSize ?? .zero
+                    let dur = CMTimeGetSeconds(asset.duration)
+                    let fs = (try? FileManager.default.attributesOfItem(atPath: vp)[.size] as? Int) ?? 0
+                    DispatchQueue.main.async {
+                        self?.activeInfoLabel.stringValue = "▶ \(self?.activeName ?? "")  ·  \(Int(sz.width))×\(Int(sz.height))  ·  HEVC  ·  \(fs/(1024*1024))MB  ·  \(Int(dur))s"
+                    }
+                }
             }
+        } else {
+            activeInfoLabel.stringValue = ""
         }
 
+        // Cards
         for file in movFiles {
             let name = (file as NSString).deletingPathExtension
             let path = (libPath as NSString).appendingPathComponent(file)
@@ -339,6 +374,36 @@ class MainController: NSObject {
             gridView.addSubview(card)
             gridView.cards.append(card)
         }
+
+        // Check if aerial is set up
+        let aerialsDir = NSString(string: "~/Library/Application Support/com.apple.wallpaper/aerials/videos").expandingTildeInPath
+        var hasAerial = false
+        if let afiles = try? FileManager.default.contentsOfDirectory(atPath: aerialsDir) {
+            hasAerial = afiles.contains(where: { $0.hasSuffix(".mov") && !$0.contains("backup") && !$0.contains("tmp") })
+        }
+
+        if !hasAerial {
+            let banner = makeBanner(
+                icon: "⚠️",
+                title: "Configuración necesaria para la pantalla de bloqueo",
+                body: "1. Abrí Configuración del Sistema → Fondo de Pantalla\n2. Buscá un fondo animado (ej: \"Tahoe Day\")\n3. Hacé click en \"Descargar\" (ícono de nube ☁️)\n4. Activá \"Mostrar como salvapantallas\"",
+                buttonTitle: "Abrir Configuración",
+                action: #selector(openWallpaperSettings)
+            )
+            gridView.bannerView = banner
+            gridView.addSubview(banner)
+        } else if movFiles.isEmpty {
+            let emptyBanner = makeBanner(
+                icon: "🎬",
+                title: "Tu biblioteca está vacía",
+                body: "Importá un video (.mp4, .mov, .gif) para usarlo como wallpaper animado.",
+                buttonTitle: "＋ Importar Video",
+                action: #selector(importVideo)
+            )
+            gridView.bannerView = emptyBanner
+            gridView.addSubview(emptyBanner)
+        }
+
         gridView.layoutCards()
     }
 
