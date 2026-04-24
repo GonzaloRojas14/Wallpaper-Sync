@@ -61,6 +61,37 @@ def atomic_copy(src, dst):
     os.replace(tmp, dst)
 
 
+def update_cold_boot_poster(video_path):
+    """Genera una imagen estática del video y la guarda en la caché del login screen."""
+    try:
+        # Obtener el UUID del usuario actual
+        user = os.environ.get("USER")
+        if not user:
+            return
+        res = subprocess.run(["dscl", ".", "-read", f"/Users/{user}", "GeneratedUID"],
+                             capture_output=True, text=True)
+        if res.returncode != 0:
+            return
+        
+        uuid = res.stdout.split()[-1].strip()
+        if not uuid:
+            return
+
+        cache_dir = f"/Library/Caches/Desktop Pictures/{uuid}"
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        lockscreen_png = os.path.join(cache_dir, "lockscreen.png")
+        
+        info("generando poster para arranque en frío...")
+        # Extraer el primer frame con ffmpeg
+        subprocess.run([
+            "ffmpeg", "-y", "-i", video_path, "-vframes", "1", "-update", "1", lockscreen_png
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+    except Exception as e:
+        info(f"warning: no se pudo actualizar el poster del login: {e}")
+
+
 def restart_wallpaper_agent():
     """Reinicia los procesos de macOS para que recarguen el nuevo video."""
     info("recargando procesos del sistema…")
@@ -160,6 +191,7 @@ def cmd_install(video_path):
 
     # Ensure macOS Index.plist points to this aerial for the Idle (lock screen)
     configure_idle_plist(aerial_id)
+    update_cold_boot_poster(video_path)
     restart_wallpaper_agent()
 
     info("✓ lock screen actualizado")
