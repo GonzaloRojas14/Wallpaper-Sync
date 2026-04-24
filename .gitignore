@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Build artifacts
+app/WallpaperEngine
+Wallpaper Sync.app/
+
+# User data (these live in ~/Library/Application Support/WallpaperSync/)
+library/
+media/
+logs/
+config.json
+*.pid
+
+# Old/legacy files
+.claude/
+
+# DMG output
+*.dmg
+dmg_staging/

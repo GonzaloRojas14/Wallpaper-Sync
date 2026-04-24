@@ -1,0 +1,394 @@
+#!/usr/bin/env bash
+# wallpaper — motor de fondos animados para macOS.
+# Todos los videos se guardan en formato HEVC (.mov) para máxima compatibilidad.
+set -euo pipefail
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+# ── Rutas ──────────────────────────────────────────────────────────────
+# BUNDLE_ROOT = donde están los ejecutables (dentro de la .app o en el repo)
+if [ -n "${APP_BUNDLE_RESOURCES:-}" ]; then
+  BUNDLE_ROOT="$APP_BUNDLE_RESOURCES"
+else
+  BUNDLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+
+# ROOT = datos del usuario (escritura)
+ROOT="$HOME/Library/Application Support/WallpaperSync"
+mkdir -p "$ROOT/library" "$ROOT/logs"
+
+APP="$BUNDLE_ROOT/app/WallpaperEngine"
+CFG="$ROOT/config.json"
+LIB="$ROOT/library"
+LOG="$ROOT/logs/engine.log"
+PID="$ROOT/logs/engine.pid"
+AGENT_LABEL="local.wallpaper.engine"
+AGENT_PLIST="$HOME/Library/LaunchAgents/${AGENT_LABEL}.plist"
+
+FFMPEG="$(command -v ffmpeg || true)"
+
+die() { echo "error: $*" >&2; exit 1; }
+info() { echo "·· $*"; }
+
+# ── Config helpers ─────────────────────────────────────────────────────
+ensure_cfg() {
+  if [ ! -f "$CFG" ]; then
+    cat > "$CFG" <<JSON
+{
+  "video": "",
+  "fill": "fill",
+  "pauseOnBattery": false,
+  "pauseOnLowPower": false,
+  "activeName": ""
+}
+JSON
+  fi
+}
+
+cfg_get() {
+  /usr/bin/python3 - "$CFG" "$1" <<'PY'
+import json,sys
+v=json.load(open(sys.argv[1])).get(sys.argv[2],"")
+if isinstance(v,bool): print("true" if v else "false")
+else: print(v)
+PY
+}
+
+cfg_set() {
+  local key="$1" val="$2"
+  /usr/bin/python3 - "$CFG" "$key" "$val" <<'PY'
+import json,sys
+p,k,v=sys.argv[1],sys.argv[2],sys.argv[3]
+d=json.load(open(p))
+if v in ("true","false"): d[k] = (v=="true")
+else: d[k] = v
+open(p,"w").write(json.dumps(d,indent=2))
+PY
+}
+
+# ── Conversión a HEVC ──────────────────────────────────────────────────
+# Se hace UNA SOLA VEZ al agregar un video. Después, todo es copiar archivos.
+convert_to_hevc_mov() {
+  local src="$1" dst="$2"
+  [ -n "$FFMPEG" ] || die "ffmpeg no está instalado (brew install ffmpeg)"
+
+  # Si ya es HEVC, solo reempaquetar como .mov
+  local codec
+  codec=$("$FFMPEG" -i "$src" -hide_banner 2>&1 | grep -o 'hevc\|h265' | head -1 || true)
+  if [ -n "$codec" ]; then
+    info "ya es HEVC, reempaquetando a .mov…"
+    "$FFMPEG" -hide_banner -loglevel error -y -i "$src" \
+      -c copy -tag:v hvc1 -movflags +faststart -an -f mov "$dst"
+    return 0
+  fi
+
+  info "codificando a HEVC (hardware)…"
+  local vf='scale=trunc(iw/2)*2:trunc(ih/2)*2'
+  if "$FFMPEG" -hide_banner -loglevel error -y -i "$src" \
+      -c:v hevc_videotoolbox -tag:v hvc1 -q:v 55 -pix_fmt yuv420p \
+      -vf "$vf" -movflags +faststart -an -f mov "$dst" 2>/dev/null; then
+    info "✓ codificado con HEVC VideoToolbox"
+    return 0
+  fi
+
+  info "fallback: x265 software…"
+  "$FFMPEG" -hide_banner -loglevel error -y -i "$src" \
+    -c:v libx265 -tag:v hvc1 -preset fast -crf 26 -pix_fmt yuv420p \
+    -vf "$vf" -movflags +faststart -an -f mov "$dst"
+}
+
+# ── Sync lock screen ──────────────────────────────────────────────────
+# El video YA está en HEVC, solo lo copiamos atómicamente al slot del aerial.
+sync_lockscreen() {
+  local video="$1"
+  [ -f "$video" ] || return 0
+  info "sincronizando lock screen…"
+  /usr/bin/python3 "$BUNDLE_ROOT/bin/_set_lockscreen_video.py" "$video" 2>&1 || true
+}
+
+# ── Engine control ────────────────────────────────────────────────────
+is_running() {
+  [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2>/dev/null
+}
+
+cmd_start() {
+  ensure_cfg
+  [ -x "$APP" ] || die "binario no encontrado: $APP"
+  local vid; vid="$(cfg_get video)"
+  [ -n "$vid" ] || die "no hay wallpaper activo. Usá: wallpaper use <nombre>"
+  if is_running; then info "ya está corriendo (pid $(cat "$PID"))"; return 0; fi
+  nohup "$APP" "$CFG" >>"$LOG" 2>&1 &
+  echo $! > "$PID"
+  sleep 0.3
+  is_running || die "no arrancó (ver $LOG)"
+  info "encendido (pid $(cat "$PID"))"
+}
+
+cmd_stop() {
+  local killed=0
+  if is_running; then
+    local p; p="$(cat "$PID")"
+    kill "$p" 2>/dev/null || true
+    for _ in 1 2 3 4 5; do
+      kill -0 "$p" 2>/dev/null || { killed=1; break; }
+      sleep 0.2
+    done
+    [ $killed -eq 1 ] || kill -9 "$p" 2>/dev/null || true
+    rm -f "$PID"
+  fi
+  pkill -9 -f "WallpaperEngine" 2>/dev/null || true
+  info "apagado"
+}
+
+cmd_restart() { cmd_stop; cmd_start; }
+
+# ── Biblioteca ────────────────────────────────────────────────────────
+cmd_add() {
+  local src="${1:-}"; [ -n "$src" ] || die "uso: wallpaper add <archivo>"
+  [ -f "$src" ] || die "no existe: $src"
+  local base; base="$(basename "$src")"
+  local stem="${base%.*}"
+  local dst="$LIB/${stem}.mov"
+
+  case "$src" in
+    *.mov|*.MOV)
+      # Verificar si ya es HEVC
+      local codec
+      codec=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "$src" 2>/dev/null || true)
+      if [ "$codec" = "hevc" ]; then
+        info "ya es HEVC .mov, copiando directo…"
+        cp -f "$src" "$dst"
+      else
+        convert_to_hevc_mov "$src" "$dst"
+      fi
+      ;;
+    *.mp4|*.MP4|*.m4v|*.M4V)
+      convert_to_hevc_mov "$src" "$dst"
+      ;;
+    *.gif|*.GIF|*.webm|*.WEBM)
+      convert_to_hevc_mov "$src" "$dst"
+      ;;
+    *) die "formato no soportado: $base" ;;
+  esac
+  info "agregado: $stem"
+}
+
+cmd_use() {
+  ensure_cfg
+  local name="${1:-}"; [ -n "$name" ] || die "uso: wallpaper use <nombre>"
+
+  # Buscar el .mov en la biblioteca
+  local match=""
+  for f in "$LIB/${name}.mov"; do
+    [ -f "$f" ] && { match="$f"; break; }
+  done
+  [ -n "$match" ] || die "no está en la biblioteca: $name (ver 'wallpaper list')"
+
+  # Actualizar config — el engine lo detecta automáticamente via checkConfig
+  cfg_set video "$match"
+  cfg_set activeName "$name"
+
+  # Sincronizar lock screen (copia atómica, ya es HEVC)
+  sync_lockscreen "$match"
+
+  info "wallpaper activo: $name"
+
+  # Si el engine no está corriendo, arrancarlo
+  if ! is_running; then
+    cmd_start
+  fi
+}
+
+cmd_set() {
+  local src="${1:-}"; [ -n "$src" ] || die "uso: wallpaper set <archivo>"
+  [ -f "$src" ] || die "no existe: $src"
+  local base; base="$(basename "$src")"
+  local stem="${base%.*}"
+
+  # Agregar a la biblioteca (convierte a HEVC si es necesario)
+  cmd_add "$src"
+
+  # Activar
+  cmd_use "$stem"
+}
+
+cmd_list() {
+  [ -d "$LIB" ] || { echo "(biblioteca vacía)"; return 0; }
+  ensure_cfg
+  local active_name; active_name="$(cfg_get activeName)"
+  shopt -s nullglob nocaseglob
+  local any=0
+  for f in "$LIB"/*.mov; do
+    any=1
+    local base; base="$(basename "$f")"
+    local stem="${base%.*}"
+    local size; size="$(du -h "$f" | cut -f1 | xargs)"
+    local mark="  "
+    [ "$stem" = "$active_name" ] && mark="▶ "
+    echo "${mark}${stem}    [${size}]"
+  done
+  [ $any -eq 1 ] || echo "(biblioteca vacía — usá 'wallpaper set <archivo>' para agregar)"
+}
+
+cmd_remove() {
+  local name="${1:-}"; [ -n "$name" ] || die "uso: wallpaper remove <nombre>"
+  local src="$LIB/${name}.mov"
+  [ -f "$src" ] || die "no existe: $name"
+  rm -f "$src"
+  info "eliminado: $name"
+}
+
+cmd_status() {
+  ensure_cfg
+  echo "video:           $(cfg_get video)"
+  echo "fill:            $(cfg_get fill)"
+  echo "pauseOnBattery:  $(cfg_get pauseOnBattery)"
+  echo "pauseOnLowPower: $(cfg_get pauseOnLowPower)"
+  echo "activeName:      $(cfg_get activeName)"
+  if is_running; then
+    echo "estado:          ACTIVO (pid $(cat "$PID"))"
+  else
+    echo "estado:          detenido"
+  fi
+  [ -f "$AGENT_PLIST" ] && echo "autoarranque:    sí" || echo "autoarranque:    no"
+}
+
+cmd_fill() {
+  local m="${1:-}"
+  case "$m" in
+    fill|fit|stretch) cfg_set fill "$m"; info "fill=$m"; is_running && cmd_restart || true ;;
+    *) die "uso: wallpaper fill <fill|fit|stretch>" ;;
+  esac
+}
+
+cmd_battery() {
+  case "${1:-}" in
+    on) cfg_set pauseOnBattery true; info "pausa en batería: on" ;;
+    off) cfg_set pauseOnBattery false; info "pausa en batería: off" ;;
+    *) die "uso: wallpaper battery <on|off>" ;;
+  esac
+  is_running && cmd_restart || true
+}
+
+cmd_lowpower() {
+  case "${1:-}" in
+    on) cfg_set pauseOnLowPower true; info "pausa en low-power: on" ;;
+    off) cfg_set pauseOnLowPower false; info "pausa en low-power: off" ;;
+    *) die "uso: wallpaper lowpower <on|off>" ;;
+  esac
+  is_running && cmd_restart || true
+}
+
+# ── Autoarranque ──────────────────────────────────────────────────────
+write_agent() {
+  mkdir -p "$(dirname "$AGENT_PLIST")"
+  cat > "$AGENT_PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>${AGENT_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${APP}</string>
+    <string>${CFG}</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key>
+  <dict><key>SuccessfulExit</key><false/></dict>
+  <key>ProcessType</key><string>Background</string>
+  <key>LowPriorityIO</key><true/>
+  <key>Nice</key><integer>5</integer>
+  <key>StandardOutPath</key><string>${LOG}</string>
+  <key>StandardErrorPath</key><string>${LOG}</string>
+</dict>
+</plist>
+PLIST
+}
+
+cmd_enable() {
+  [ -x "$APP" ] || die "binario no encontrado: $APP"
+  cmd_stop || true
+  write_agent
+  launchctl unload "$AGENT_PLIST" 2>/dev/null || true
+  launchctl load "$AGENT_PLIST"
+  info "autoarranque instalado"
+}
+
+cmd_disable() {
+  if [ -f "$AGENT_PLIST" ]; then
+    launchctl unload "$AGENT_PLIST" 2>/dev/null || true
+    rm -f "$AGENT_PLIST"
+    info "autoarranque desinstalado"
+  else
+    info "autoarranque no estaba instalado"
+  fi
+}
+
+cmd_logs() { tail -n "${1:-80}" "$LOG" 2>/dev/null || echo "(sin logs)"; }
+
+cmd_lockscreen() {
+  local vid; vid="$(cfg_get video)"
+  [ -n "$vid" ] && [ -f "$vid" ] || die "no hay wallpaper activo"
+  /usr/bin/python3 "$BUNDLE_ROOT/bin/_set_lockscreen_video.py" "$vid"
+}
+
+cmd_test() {
+  ensure_cfg
+  [ -x "$APP" ] || die "binario no encontrado: $APP"
+  local vid; vid="$(cfg_get video)"
+  [ -n "$vid" ] || die "no hay wallpaper activo"
+  cmd_stop || true
+  info "sanity-check: ventanita 320x180, se cierra sola en 8s"
+  "$APP" "$CFG" --sanity 2>&1 | tee -a "$LOG"
+}
+
+# ── Dispatch ──────────────────────────────────────────────────────────
+usage() {
+  cat <<EOF
+wallpaper — motor de fondos animados para macOS
+
+USO:
+  wallpaper set <archivo>       Convierte a HEVC y activa como wallpaper
+  wallpaper use <nombre>        Activa un wallpaper de la biblioteca (instantáneo)
+  wallpaper add <archivo>       Agrega a la biblioteca sin activar
+  wallpaper list                Lista la biblioteca (▶ = activo)
+  wallpaper remove <nombre>     Elimina de la biblioteca
+  wallpaper start | stop | restart
+  wallpaper status              Muestra estado y configuración
+  wallpaper logs [N]            Últimas N líneas de log
+  wallpaper test                Sanity-check visual
+  wallpaper lockscreen          Sincroniza lock screen manualmente
+  wallpaper lockscreen-restore  Restaura el aerial original
+  wallpaper lockscreen-status   Muestra estado del lock screen
+  wallpaper fill <fill|fit|stretch>
+  wallpaper battery <on|off>
+  wallpaper lowpower <on|off>
+  wallpaper enable              Autoarranque al iniciar sesión
+  wallpaper disable             Quita el autoarranque
+EOF
+}
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  set)       cmd_set "$@" ;;
+  use)       cmd_use "$@" ;;
+  add)       cmd_add "$@" ;;
+  list|ls)   cmd_list ;;
+  remove|rm) cmd_remove "$@" ;;
+  start)     cmd_start ;;
+  stop)      cmd_stop ;;
+  restart)   cmd_restart ;;
+  status)    cmd_status ;;
+  logs)      cmd_logs "$@" ;;
+  test)      cmd_test ;;
+  lockscreen|lock) cmd_lockscreen ;;
+  lockscreen-restore) /usr/bin/python3 "$BUNDLE_ROOT/bin/_set_lockscreen_video.py" --restore ;;
+  lockscreen-status) /usr/bin/python3 "$BUNDLE_ROOT/bin/_set_lockscreen_video.py" --status ;;
+  fill)      cmd_fill "$@" ;;
+  battery)   cmd_battery "$@" ;;
+  lowpower)  cmd_lowpower "$@" ;;
+  enable)    cmd_enable ;;
+  disable)   cmd_disable ;;
+  ""|help|-h|--help) usage ;;
+  *) usage; exit 1 ;;
+esac
