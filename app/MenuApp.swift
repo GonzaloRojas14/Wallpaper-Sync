@@ -50,6 +50,7 @@ class WallpaperCard: NSView {
     var isHovered: Bool = false { didSet { needsDisplay = true } }
     var onClick: (() -> Void)?
     var onDelete: (() -> Void)?
+    var thumbHeight: CGFloat = Theme.thumbH
 
     private let thumbView = NSImageView()
     private let nameLabel = NSTextField(labelWithString: "")
@@ -115,8 +116,8 @@ class WallpaperCard: NSView {
     override func layout() {
         super.layout()
         let b = bounds
-        thumbView.frame = NSRect(x: 0, y: b.height - Theme.thumbH, width: b.width, height: Theme.thumbH)
-        nameLabel.frame = NSRect(x: 8, y: 2, width: b.width - 16, height: b.height - Theme.thumbH - 4)
+        thumbView.frame = NSRect(x: 0, y: b.height - thumbHeight, width: b.width, height: thumbHeight)
+        nameLabel.frame = NSRect(x: 8, y: 2, width: b.width - 16, height: b.height - thumbHeight - 4)
         checkBadge.frame = NSRect(x: b.width - 30, y: b.height - 30, width: 24, height: 24)
     }
 
@@ -149,21 +150,39 @@ class WallpaperCard: NSView {
 // MARK: - Grid Container
 class GridView: NSView {
     var cards: [WallpaperCard] = []
+    var bannerView: NSView?
 
     override var isFlipped: Bool { true }
 
     func layoutCards() {
-        let cols = max(1, Int((bounds.width - Theme.pad) / (Theme.cardW + Theme.gap)))
+        let availWidth = bounds.width - Theme.pad * 2
+        // Dynamic columns: fit as many as possible with min card width 220
+        let cols = max(1, Int(availWidth / (220 + Theme.gap)))
+        let cardW = (availWidth - CGFloat(cols - 1) * Theme.gap) / CGFloat(cols)
+        let thumbH = cardW * 0.6
+        let cardH = thumbH + 30
+
+        var startY: CGFloat = Theme.pad
+        // Account for banner
+        if let banner = bannerView {
+            banner.frame = NSRect(x: Theme.pad, y: Theme.pad, width: availWidth, height: banner.frame.height)
+            startY = banner.frame.maxY + Theme.gap
+        }
+
         for (i, card) in cards.enumerated() {
             let col = i % cols
             let row = i / cols
-            let x = Theme.pad + CGFloat(col) * (Theme.cardW + Theme.gap)
-            let y = Theme.pad + CGFloat(row) * (Theme.cardH + Theme.gap)
-            card.frame = NSRect(x: x, y: y, width: Theme.cardW, height: Theme.cardH)
+            let x = Theme.pad + CGFloat(col) * (cardW + Theme.gap)
+            let y = startY + CGFloat(row) * (cardH + Theme.gap)
+            card.frame = NSRect(x: x, y: y, width: cardW, height: cardH)
+
+            // Update thumb height inside card
+            card.thumbHeight = thumbH
+            card.needsLayout = true
         }
-        let rows = cards.isEmpty ? 0 : (cards.count - 1) / max(1, Int((bounds.width - Theme.pad) / (Theme.cardW + Theme.gap))) + 1
-        let h = Theme.pad * 2 + CGFloat(rows) * (Theme.cardH + Theme.gap)
-        frame.size.height = max(h, superview?.bounds.height ?? 0)
+        let rows = cards.isEmpty ? 0 : (cards.count - 1) / cols + 1
+        let contentH = startY + CGFloat(rows) * (cardH + Theme.gap) + Theme.pad
+        frame.size.height = max(contentH, superview?.bounds.height ?? 0)
     }
 
     override func resizeSubviews(withOldSize oldSize: NSSize) {
@@ -192,7 +211,7 @@ class MainController: NSObject {
 
     override init() {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 820, height: 560),
-                          styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                           backing: .buffered, defer: false)
         super.init()
 
@@ -203,6 +222,7 @@ class MainController: NSObject {
         window.backgroundColor = Theme.bg
         window.titlebarAppearsTransparent = true
         window.appearance = NSAppearance(named: .darkAqua)
+        window.collectionBehavior = [.fullScreenPrimary]
 
         let contentView = NSView(frame: window.contentView!.bounds)
         contentView.wantsLayer = true
@@ -257,11 +277,57 @@ class MainController: NSObject {
         // Clear
         gridView.cards.forEach { $0.removeFromSuperview() }
         gridView.cards.removeAll()
+        gridView.bannerView?.removeFromSuperview()
+        gridView.bannerView = nil
+
+        // Check if aerial is set up
+        let aerialsDir = NSString(string: "~/Library/Application Support/com.apple.wallpaper/aerials/videos").expandingTildeInPath
+        var hasAerial = false
+        if let files = try? FileManager.default.contentsOfDirectory(atPath: aerialsDir) {
+            hasAerial = files.contains(where: { $0.hasSuffix(".mov") && !$0.contains("backup") && !$0.contains("tmp") })
+        }
+
+        if !hasAerial {
+            let banner = makeBanner(
+                icon: "⚠️",
+                title: "Configuración necesaria para la pantalla de bloqueo",
+                body: """
+                Para que tu wallpaper aparezca también en la pantalla de bloqueo, \
+                necesitás descargar un fondo animado del sistema:
+
+                1. Abrí Configuración del Sistema → Fondo de Pantalla
+                2. Buscá un fondo animado (ej: "Tahoe Day")
+                3. Hacé click en "Descargar" (ícono de nube ☁️)
+                4. Activá "Mostrar como salvapantallas"
+                5. ¡Listo! Wallpaper Sync lo reemplaza automáticamente.
+
+                Esto se hace una sola vez.
+                """,
+                buttonTitle: "Abrir Configuración",
+                action: #selector(openWallpaperSettings)
+            )
+            gridView.bannerView = banner
+            gridView.addSubview(banner)
+        }
 
         // Load videos
         let libPath = appSupportURL.appendingPathComponent("library").path
         guard let files = try? FileManager.default.contentsOfDirectory(atPath: libPath) else { return }
         let movFiles = files.filter { $0.hasSuffix(".mov") }.sorted()
+
+        if movFiles.isEmpty {
+            let emptyBanner = makeBanner(
+                icon: "🎬",
+                title: "Tu biblioteca está vacía",
+                body: "Importá un video (.mp4, .mov, .gif) para usarlo como wallpaper animado.",
+                buttonTitle: "＋ Importar Video",
+                action: #selector(importVideo)
+            )
+            if gridView.bannerView == nil {
+                gridView.bannerView = emptyBanner
+                gridView.addSubview(emptyBanner)
+            }
+        }
 
         for file in movFiles {
             let name = (file as NSString).deletingPathExtension
@@ -274,6 +340,50 @@ class MainController: NSObject {
             gridView.cards.append(card)
         }
         gridView.layoutCards()
+    }
+
+    private func makeBanner(icon: String, title: String, body: String, buttonTitle: String, action: Selector) -> NSView {
+        let banner = NSView(frame: NSRect(x: 0, y: 0, width: 100, height: 160))
+        banner.wantsLayer = true
+        banner.layer?.backgroundColor = NSColor(red: 0.18, green: 0.15, blue: 0.30, alpha: 1).cgColor
+        banner.layer?.cornerRadius = 12
+        banner.layer?.borderWidth = 1
+        banner.layer?.borderColor = Theme.accent.withAlphaComponent(0.3).cgColor
+
+        let iconLabel = NSTextField(labelWithString: icon)
+        iconLabel.font = NSFont.systemFont(ofSize: 28)
+        iconLabel.frame = NSRect(x: 16, y: 120, width: 40, height: 36)
+        banner.addSubview(iconLabel)
+
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = NSFont.systemFont(ofSize: 15, weight: .bold)
+        titleLabel.textColor = Theme.textPri
+        titleLabel.frame = NSRect(x: 56, y: 124, width: 600, height: 24)
+        banner.addSubview(titleLabel)
+
+        let bodyLabel = NSTextField(wrappingLabelWithString: body)
+        bodyLabel.font = NSFont.systemFont(ofSize: 12)
+        bodyLabel.textColor = Theme.textSec
+        bodyLabel.frame = NSRect(x: 16, y: 36, width: 700, height: 84)
+        bodyLabel.maximumNumberOfLines = 10
+        bodyLabel.usesSingleLineMode = false
+        banner.addSubview(bodyLabel)
+
+        let btn = NSButton(title: buttonTitle, target: self, action: action)
+        btn.bezelStyle = .rounded
+        btn.wantsLayer = true
+        btn.layer?.backgroundColor = Theme.accent.cgColor
+        btn.layer?.cornerRadius = 6
+        btn.contentTintColor = .white
+        btn.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        btn.frame = NSRect(x: 16, y: 6, width: 180, height: 26)
+        banner.addSubview(btn)
+
+        return banner
+    }
+
+    @objc func openWallpaperSettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Wallpaper-Settings.extension")!)
     }
 
     private func useWallpaper(_ name: String) {
