@@ -96,16 +96,10 @@ final class WallpaperEngine: NSObject {
 
         log("config changed: \(newVideo)")
         currentVideoPath = newVideo
-        let newURL = URL(fileURLWithPath: newVideo)
 
-        // Each player needs its OWN AVPlayerItem — they cannot be shared
-        for (idx, player) in players.enumerated() {
-            let asset = AVURLAsset(url: newURL)
-            let item = AVPlayerItem(asset: asset)
-            player.removeAllItems()
-            player.insert(item, after: nil)
-            loopers[idx] = AVPlayerLooper(player: player, templateItem: item)
-            if !isPaused { player.play() }
+        // Completely rebuild windows/players to avoid AVFoundation state corruption (grey/black screens)
+        DispatchQueue.main.async { [weak self] in
+            self?.rebuildWindows()
         }
     }
 
@@ -190,34 +184,34 @@ final class WallpaperEngine: NSObject {
         log("screen locked — pausing and hiding")
         players.forEach { $0.pause() }
         windows.forEach { $0.orderOut(nil) }
+
+        // Refresh the aerial extension NOW, so by the time the lock screen appears, it has loaded the new file
+        DispatchQueue.global(qos: .background).async {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+            proc.arguments = ["WallpaperAerialsExtension"]
+            try? proc.run()
+            proc.waitUntilExit()
+            log("killed WallpaperAerialsExtension for fresh lock screen")
+        }
     }
 
     @objc private func screenUnlocked() {
         log("screen unlocked — resuming")
         if !isPaused { players.forEach { $0.play() } }
         windows.forEach { $0.orderFront(nil) }
-
-        // Refresh the aerial extension so the lock screen video is ready for next time
-        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 2.0) {
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-            proc.arguments = ["WallpaperAerialsExtension"]
-            try? proc.run()
-            proc.waitUntilExit()
-            log("refreshed WallpaperAerialsExtension for next lock")
-        }
     }
 
     @objc private func displaySleep() {
         log("display sleep — pausing and hiding")
         players.forEach { $0.pause() }
-        windows.forEach { $0.orderOut(nil) }  // CRITICAL: hide so we don't cover the lock screen on wake
+        windows.forEach { $0.orderOut(nil) }
     }
 
     @objc private func displayWake() {
         log("display wake")
-        // Don't show windows here — wait for screenUnlocked
-        // (the lock screen is visible at this point)
+        // The screen might still be locked here, but if not, ensure we resume
+        if !isPaused { players.forEach { $0.play() } }
     }
 
     @objc private func powerStateChanged() { applyPowerPolicy() }

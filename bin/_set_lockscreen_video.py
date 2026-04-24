@@ -53,9 +53,11 @@ def load_manifest():
 
 
 def atomic_copy(src, dst):
-    """Copia atómica: escribe a .tmp y luego renombra. Instantáneo y seguro."""
+    """Copia el video forzando un nuevo inodo para que macOS no use caché viejo."""
     tmp = dst + ".tmp"
     shutil.copy2(src, tmp)
+    if os.path.exists(dst):
+        os.unlink(dst)
     os.replace(tmp, dst)
 
 
@@ -94,6 +96,9 @@ def configure_idle_plist(aerial_id):
 
         with open(INDEX_PLIST, 'wb') as f:
             plistlib.dump(d, f)
+
+        # Forzar un cambio de timestamp para que macOS note que el archivo cambió
+        os.utime(INDEX_PLIST, None)
 
         info(f"configurado aerial {aerial_id} en Index.plist")
     except Exception as e:
