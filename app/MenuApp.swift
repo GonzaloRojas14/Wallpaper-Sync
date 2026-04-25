@@ -214,6 +214,7 @@ class MainController: NSObject {
     private let statusDot = NSView()
     private let statusLabel = NSTextField(labelWithString: "")
     private let activeInfoLabel = NSTextField(labelWithString: "")
+    private let powerSaveBtn = NSButton()
 
     override init() {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 880, height: 620),
@@ -263,10 +264,29 @@ class MainController: NSObject {
             grad.addSublayer(orb)
         }
 
-        // Header — just import button, title is in native title bar
-        let header = NSView(frame: NSRect(x: 0, y: cv.bounds.height - 48, width: cv.bounds.width, height: 48))
+        // Header with Glassmorphism
+        let header = NSVisualEffectView(frame: NSRect(x: 0, y: cv.bounds.height - 52, width: cv.bounds.width, height: 52))
         header.autoresizingMask = [.width, .minYMargin]
+        header.material = .sidebar
+        header.blendingMode = .withinWindow
+        header.state = .active
         cv.addSubview(header)
+        
+        let appTitle = NSTextField(labelWithString: "Wallpaper Sync")
+        appTitle.font = NSFont.systemFont(ofSize: 14, weight: .bold)
+        appTitle.textColor = .white
+        appTitle.frame = NSRect(x: 16, y: 16, width: 150, height: 20)
+        header.addSubview(appTitle)
+
+        // Power Save Button
+        powerSaveBtn.setButtonType(.switch)
+        powerSaveBtn.title = "Ahorro de Energía"
+        powerSaveBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        powerSaveBtn.target = self
+        powerSaveBtn.action = #selector(togglePowerSaveHUD)
+        powerSaveBtn.frame = NSRect(x: cv.bounds.width - 280, y: 16, width: 140, height: 20)
+        powerSaveBtn.autoresizingMask = [.minXMargin]
+        header.addSubview(powerSaveBtn)
 
         let importBtn = NSButton(title: "＋ Importar", target: self, action: #selector(importVideo))
         importBtn.bezelStyle = .rounded
@@ -275,15 +295,16 @@ class MainController: NSObject {
         importBtn.layer?.cornerRadius = 8
         importBtn.contentTintColor = .white
         importBtn.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-        importBtn.frame = NSRect(x: cv.bounds.width - 130, y: 10, width: 110, height: 28)
+        importBtn.frame = NSRect(x: cv.bounds.width - 120, y: 12, width: 100, height: 28)
         importBtn.autoresizingMask = [.minXMargin]
         header.addSubview(importBtn)
 
-        // Bottom status bar
-        let bottomBar = NSView(frame: NSRect(x: 0, y: 0, width: cv.bounds.width, height: 32))
-        bottomBar.wantsLayer = true
-        bottomBar.layer?.backgroundColor = NSColor(white: 0, alpha: 0.3).cgColor
-        bottomBar.autoresizingMask = [.width]
+        // Bottom status bar with Glassmorphism
+        let bottomBar = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: cv.bounds.width, height: 32))
+        bottomBar.autoresizingMask = [.width, .maxYMargin]
+        bottomBar.material = .sidebar
+        bottomBar.blendingMode = .withinWindow
+        bottomBar.state = .active
         cv.addSubview(bottomBar)
 
         statusDot.wantsLayer = true
@@ -304,7 +325,7 @@ class MainController: NSObject {
         bottomBar.addSubview(activeInfoLabel)
 
         // Scroll + Grid
-        scrollView.frame = NSRect(x: 0, y: 32, width: cv.bounds.width, height: cv.bounds.height - 48 - 32)
+        scrollView.frame = NSRect(x: 0, y: 32, width: cv.bounds.width, height: cv.bounds.height - 52 - 32)
         scrollView.autoresizingMask = [.width, .height]
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = false
@@ -317,12 +338,16 @@ class MainController: NSObject {
     }
 
     func reloadLibrary() {
-        // Read active name
+        // Read active name and power save
         let cfgPath = appSupportURL.appendingPathComponent("config.json").path
         if let data = try? Data(contentsOf: URL(fileURLWithPath: cfgPath)),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let name = json["activeName"] as? String {
-            activeName = name
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let name = json["activeName"] as? String {
+                activeName = name
+            }
+            if let ps = json["powerSavingMode"] as? Bool {
+                powerSaveBtn.state = ps ? .on : .off
+            }
         }
 
         // Clear
@@ -457,6 +482,15 @@ class MainController: NSObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.runCommand("bin/wallpaper", args: ["use", name])
         }
+        // Force refresh active info
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.reloadLibrary() }
+    }
+
+    @objc func togglePowerSaveHUD() {
+        let isPowerSave = (powerSaveBtn.state == .on)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.runCommand("bin/wallpaper", args: ["powersave", isPowerSave ? "on" : "off"])
+        }
     }
 
     private func deleteWallpaper(_ name: String) {
@@ -519,8 +553,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let btn = statusItem.button {
             btn.title = "🎬"
-            btn.action = #selector(toggleWindow)
+            btn.action = #selector(statusItemClicked(_:))
             btn.target = self
+            btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
 
         // Start minimized — only menu bar icon visible, no dock icon
@@ -624,6 +659,50 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             try? proc.run()
         }
         onReady()
+    }
+
+    @objc func statusItemClicked(_ sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent!
+        if event.type == .rightMouseUp {
+            let menu = NSMenu()
+            menu.addItem(NSMenuItem(title: "Abrir HUD", action: #selector(toggleWindow), keyEquivalent: ""))
+            
+            let pSave = NSMenuItem(title: "Ahorro de Energía (Modo estático)", action: #selector(togglePowerSaveMenu), keyEquivalent: "")
+            let cfgPath = mainController.appSupportURL.appendingPathComponent("config.json").path
+            if let data = try? Data(contentsOf: URL(fileURLWithPath: cfgPath)),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let ps = json["powerSavingMode"] as? Bool, ps {
+                pSave.state = .on
+            } else {
+                pSave.state = .off
+            }
+            menu.addItem(pSave)
+            
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(NSMenuItem(title: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+            
+            statusItem.menu = menu
+            statusItem.button?.performClick(nil)
+            statusItem.menu = nil // remove so left click works natively
+        } else {
+            toggleWindow()
+        }
+    }
+
+    @objc func togglePowerSaveMenu() {
+        let cfgPath = mainController.appSupportURL.appendingPathComponent("config.json").path
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: cfgPath)),
+              var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        
+        let current = json["powerSavingMode"] as? Bool ?? false
+        let newState = !current
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.mainController.runCommand("bin/wallpaper", args: ["powersave", newState ? "on" : "off"])
+            DispatchQueue.main.async {
+                self?.mainController.reloadLibrary()
+            }
+        }
     }
 
     @objc func toggleWindow() {

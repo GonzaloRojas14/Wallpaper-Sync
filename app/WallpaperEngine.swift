@@ -24,6 +24,7 @@ final class WallpaperEngine: NSObject {
     private let fillMode: AVLayerVideoGravity
     private let pauseOnBattery: Bool
     private let pauseOnLowPower: Bool
+    private var powerSavingMode: Bool
     private let sanityMode: Bool
     private let windowLevel: Int
     private let configPath: String
@@ -31,11 +32,12 @@ final class WallpaperEngine: NSObject {
     private var configTimer: Timer?
 
     init(videoPath: String, fillMode: AVLayerVideoGravity, pauseOnBattery: Bool,
-         pauseOnLowPower: Bool, sanityMode: Bool, windowLevel: Int, configPath: String) {
+         pauseOnLowPower: Bool, powerSavingMode: Bool, sanityMode: Bool, windowLevel: Int, configPath: String) {
         self.currentVideoPath = videoPath
         self.fillMode = fillMode
         self.pauseOnBattery = pauseOnBattery
         self.pauseOnLowPower = pauseOnLowPower
+        self.powerSavingMode = powerSavingMode
         self.sanityMode = sanityMode
         self.windowLevel = windowLevel
         self.configPath = configPath
@@ -88,18 +90,29 @@ final class WallpaperEngine: NSObject {
 
     @objc private func checkConfig() {
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: configPath)),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let newVideo = json["video"] as? String,
-              !newVideo.isEmpty,
-              newVideo != currentVideoPath,
-              FileManager.default.fileExists(atPath: newVideo) else { return }
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
 
-        log("config changed: \(newVideo)")
-        currentVideoPath = newVideo
+        var changedVideo = false
+        if let newVideo = json["video"] as? String,
+           !newVideo.isEmpty,
+           newVideo != currentVideoPath,
+           FileManager.default.fileExists(atPath: newVideo) {
+            currentVideoPath = newVideo
+            changedVideo = true
+        }
 
-        // Completely rebuild windows/players to avoid AVFoundation state corruption (grey/black screens)
-        DispatchQueue.main.async { [weak self] in
-            self?.rebuildWindows()
+        let newPowerSave = json["powerSavingMode"] as? Bool ?? false
+        let changedPowerSave = newPowerSave != powerSavingMode
+        if changedPowerSave {
+            powerSavingMode = newPowerSave
+        }
+
+        if changedVideo {
+            log("config changed: \(currentVideoPath)")
+            DispatchQueue.main.async { [weak self] in self?.rebuildWindows() }
+        } else if changedPowerSave {
+            log("power saving mode changed: \(powerSavingMode)")
+            DispatchQueue.main.async { [weak self] in self?.applyPowerPolicy() }
         }
     }
 
@@ -234,8 +247,8 @@ final class WallpaperEngine: NSObject {
     private func applyPowerPolicy() {
         let lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
         let battery = isOnBattery()
-        let shouldPause = (pauseOnLowPower && lowPower) || (pauseOnBattery && battery)
-        log("power: lowPower=\(lowPower) battery=\(battery) shouldPause=\(shouldPause)")
+        let shouldPause = powerSavingMode || (pauseOnLowPower && lowPower) || (pauseOnBattery && battery)
+        log("power: lowPower=\(lowPower) battery=\(battery) powerSave=\(powerSavingMode) shouldPause=\(shouldPause)")
         if shouldPause { isPaused = true; players.forEach { $0.pause() } }
         else { isPaused = false; players.forEach { $0.play() } }
     }
@@ -254,16 +267,18 @@ struct Config {
     var fill: String
     var pauseOnBattery: Bool
     var pauseOnLowPower: Bool
+    var powerSavingMode: Bool
 }
 
 func loadConfig(path: String) -> Config {
-    var cfg = Config(video: "", fill: "fill", pauseOnBattery: false, pauseOnLowPower: false)
+    var cfg = Config(video: "", fill: "fill", pauseOnBattery: false, pauseOnLowPower: false, powerSavingMode: false)
     guard let data = FileManager.default.contents(atPath: path),
           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return cfg }
     if let v = obj["video"] as? String { cfg.video = v }
     if let f = obj["fill"] as? String { cfg.fill = f }
     if let b = obj["pauseOnBattery"] as? Bool { cfg.pauseOnBattery = b }
     if let l = obj["pauseOnLowPower"] as? Bool { cfg.pauseOnLowPower = l }
+    if let p = obj["powerSavingMode"] as? Bool { cfg.powerSavingMode = p }
     return cfg
 }
 
@@ -303,6 +318,7 @@ let engine = WallpaperEngine(
     fillMode: gravity,
     pauseOnBattery: cfg.pauseOnBattery,
     pauseOnLowPower: cfg.pauseOnLowPower,
+    powerSavingMode: cfg.powerSavingMode,
     sanityMode: sanity,
     windowLevel: effectiveLevel,
     configPath: args[1]

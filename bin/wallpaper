@@ -38,6 +38,7 @@ ensure_cfg() {
   "fill": "fill",
   "pauseOnBattery": false,
   "pauseOnLowPower": false,
+  "powerSavingMode": false,
   "activeName": ""
 }
 JSON
@@ -243,6 +244,7 @@ cmd_status() {
   echo "fill:            $(cfg_get fill)"
   echo "pauseOnBattery:  $(cfg_get pauseOnBattery)"
   echo "pauseOnLowPower: $(cfg_get pauseOnLowPower)"
+  echo "powerSavingMode: $(cfg_get powerSavingMode)"
   echo "activeName:      $(cfg_get activeName)"
   if is_running; then
     echo "estado:          ACTIVO (pid $(cat "$PID"))"
@@ -276,6 +278,15 @@ cmd_lowpower() {
     *) die "uso: wallpaper lowpower <on|off>" ;;
   esac
   is_running && cmd_restart || true
+}
+
+cmd_powersave() {
+  case "${1:-}" in
+    on) cfg_set powerSavingMode true; info "ahorro de energía (modo estático): on" ;;
+    off) cfg_set powerSavingMode false; info "ahorro de energía (modo estático): off" ;;
+    *) die "uso: wallpaper powersave <on|off>" ;;
+  esac
+  # The engine listens to this config change dynamically, no need to restart
 }
 
 # ── Autoarranque ──────────────────────────────────────────────────────
@@ -363,6 +374,7 @@ USO:
   wallpaper fill <fill|fit|stretch>
   wallpaper battery <on|off>
   wallpaper lowpower <on|off>
+  wallpaper powersave <on|off>  Activa un frame estático para ahorrar energía
   wallpaper enable              Autoarranque al iniciar sesión
   wallpaper disable             Quita el autoarranque
 EOF
@@ -387,6 +399,7 @@ case "$cmd" in
   fill)      cmd_fill "$@" ;;
   battery)   cmd_battery "$@" ;;
   lowpower)  cmd_lowpower "$@" ;;
+  powersave) cmd_powersave "$@" ;;
   enable)    cmd_enable ;;
   disable)   cmd_disable ;;
   ""|help|-h|--help) usage ;;
