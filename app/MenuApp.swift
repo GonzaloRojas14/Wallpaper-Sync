@@ -271,12 +271,6 @@ class MainController: NSObject {
         header.blendingMode = .withinWindow
         header.state = .active
         cv.addSubview(header)
-        
-        let appTitle = NSTextField(labelWithString: "Wallpaper Sync")
-        appTitle.font = NSFont.systemFont(ofSize: 14, weight: .bold)
-        appTitle.textColor = .white
-        appTitle.frame = NSRect(x: 16, y: 16, width: 150, height: 20)
-        header.addSubview(appTitle)
 
         // Power Save Button
         powerSaveBtn.setButtonType(.switch)
