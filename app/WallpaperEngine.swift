@@ -29,7 +29,12 @@ final class WallpaperEngine: NSObject {
     private let windowLevel: Int
     private let configPath: String
     private var isPaused = false
-    private var configTimer: Timer?
+    private var configSource: DispatchSourceFileSystemObject?
+    private var configFD: Int32 = -1
+    private var configFallbackTimer: Timer?
+    private var logRotateTimer: Timer?
+    private var isShuttingDown = false
+    private var aerialNeedsRefresh = false
 
     init(videoPath: String, fillMode: AVLayerVideoGravity, pauseOnBattery: Bool,
          pauseOnLowPower: Bool, powerSavingMode: Bool, sanityMode: Bool, windowLevel: Int, configPath: String) {
@@ -77,13 +82,95 @@ final class WallpaperEngine: NSObject {
         sigInt.resume()
         signal(SIGTERM, SIG_IGN); signal(SIGINT, SIG_IGN)
 
-        // Single config watcher timer — NOT in rebuildWindows to avoid duplicates
-        configTimer = Timer.scheduledTimer(timeInterval: 0.5, target: self,
-                                           selector: #selector(checkConfig), userInfo: nil, repeats: true)
+        // Watcher por FSEvents — sin polling 2x/s
+        startConfigWatcher()
+
+        // Rotación de logs cada 5 min (rota solo si supera 1 MB)
+        logRotateTimer = Timer.scheduledTimer(timeInterval: 300.0, target: self,
+                                              selector: #selector(rotateLogIfNeeded),
+                                              userInfo: nil, repeats: true)
+        rotateLogIfNeeded()
 
         if sanityMode {
             DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) { [weak self] in self?.shutdown() }
         }
+    }
+
+    // MARK: - Log rotation
+
+    private var logFilePath: String {
+        return (configPath as NSString).deletingLastPathComponent + "/logs/engine.log"
+    }
+
+    @objc private func rotateLogIfNeeded() {
+        let path = logFilePath
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = (attrs[.size] as? NSNumber)?.uint64Value,
+              size > 1_048_576 else { return }
+
+        let oldPath = path + ".1"
+        try? FileManager.default.removeItem(atPath: oldPath)
+        do {
+            try FileManager.default.moveItem(atPath: path, toPath: oldPath)
+        } catch {
+            return
+        }
+
+        // Reabrir fd 1 y fd 2 contra el archivo nuevo. Los descriptores viejos
+        // siguen apuntando al inodo renombrado (.1) hasta que dup2() los reemplace.
+        let newFD = open(path, O_WRONLY | O_CREAT | O_APPEND, 0o644)
+        if newFD >= 0 {
+            dup2(newFD, fileno(stdout))
+            dup2(newFD, fileno(stderr))
+            close(newFD)
+            log("log rotated -> \(oldPath)")
+        }
+    }
+
+    // MARK: - Config hot-reload (FSEvents)
+
+    private func startConfigWatcher() {
+        if isShuttingDown { return }
+
+        let fd = open(configPath, O_EVTONLY)
+        guard fd >= 0 else {
+            log("config watcher: open failed (errno \(errno)), polling cada 2s")
+            if configFallbackTimer == nil {
+                configFallbackTimer = Timer.scheduledTimer(timeInterval: 2.0, target: self,
+                                                          selector: #selector(checkConfig),
+                                                          userInfo: nil, repeats: true)
+            }
+            return
+        }
+        configFD = fd
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .extend, .delete, .rename, .attrib],
+            queue: .main
+        )
+
+        source.setEventHandler { [weak self, weak source] in
+            guard let self = self, let src = source else { return }
+            let events = src.data
+            self.checkConfig()
+            if events.contains(.delete) || events.contains(.rename) {
+                // Reemplazo atómico (mv/replace): cancelar y reabrir contra el nuevo inodo
+                src.cancel()
+            }
+        }
+        source.setCancelHandler { [weak self] in
+            close(fd)
+            guard let self = self, !self.isShuttingDown else { return }
+            self.configFD = -1
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.startConfigWatcher()
+                self?.checkConfig()
+            }
+        }
+
+        configSource = source
+        source.resume()
     }
 
     // MARK: - Config hot-reload
@@ -109,6 +196,7 @@ final class WallpaperEngine: NSObject {
 
         if changedVideo {
             log("config changed: \(currentVideoPath)")
+            aerialNeedsRefresh = true
             DispatchQueue.main.async { [weak self] in self?.rebuildWindows() }
         } else if changedPowerSave {
             log("power saving mode changed: \(powerSavingMode)")
@@ -185,7 +273,10 @@ final class WallpaperEngine: NSObject {
     // MARK: - Lifecycle
 
     private func shutdown() {
-        configTimer?.invalidate()
+        isShuttingDown = true
+        configFallbackTimer?.invalidate(); configFallbackTimer = nil
+        logRotateTimer?.invalidate(); logRotateTimer = nil
+        configSource?.cancel(); configSource = nil
         players.forEach { $0.pause() }
         windows.forEach { $0.orderOut(nil) }
         NSApp.terminate(nil)
@@ -198,7 +289,10 @@ final class WallpaperEngine: NSObject {
         players.forEach { $0.pause() }
         windows.forEach { $0.orderOut(nil) }
 
-        // Refresh the aerial extension NOW, so by the time the lock screen appears, it has loaded the new file
+        // Solo reciclar el aerial si el video cambió desde el último lock —
+        // evita reiniciar la extensión cada vez que bloqueás la pantalla.
+        guard aerialNeedsRefresh else { return }
+        aerialNeedsRefresh = false
         DispatchQueue.global(qos: .background).async {
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/killall")

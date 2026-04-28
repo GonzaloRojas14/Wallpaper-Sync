@@ -9,9 +9,20 @@ Uso:
     _set_lockscreen_video.py --restore         # restaura el aerial original
     _set_lockscreen_video.py --status          # muestra el estado
 """
-import os, sys, json, shutil, subprocess, datetime, plistlib
+import os, sys, json, shutil, subprocess, datetime, plistlib, time
 
 os.environ["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + os.environ.get("PATH", "")
+
+LOG_FILE = os.path.expanduser("~/Library/Application Support/WallpaperSync/logs/engine.log")
+
+
+def _log_to_file(msg):
+    try:
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+        with open(LOG_FILE, "a") as f:
+            f.write(f"[lockscreen] {msg}\n")
+    except Exception:
+        pass
 
 AERIALS_DIR = os.path.expanduser("~/Library/Application Support/com.apple.wallpaper/aerials/videos")
 MANIFEST_DIR = os.path.expanduser("~/Library/Application Support/com.apple.wallpaper/aerials/manifest")
@@ -62,34 +73,94 @@ def atomic_copy(src, dst):
 
 
 def update_cold_boot_poster(video_path):
-    """Genera una imagen estática del video y la guarda en la caché del login screen."""
-    try:
-        # Obtener el UUID del usuario actual
-        user = os.environ.get("USER")
-        if not user:
-            return
-        res = subprocess.run(["dscl", ".", "-read", f"/Users/{user}", "GeneratedUID"],
-                             capture_output=True, text=True)
-        if res.returncode != 0:
-            return
-        
-        uuid = res.stdout.split()[-1].strip()
-        if not uuid:
-            return
+    """Genera una imagen estática del video y la guarda en la caché del login screen.
+    Devuelve True si el poster se regeneró correctamente.
+    """
+    user = os.environ.get("USER")
+    if not user:
+        info("warning: $USER no está seteado, omito poster")
+        _log_to_file("poster: $USER missing")
+        return False
 
-        cache_dir = f"/Library/Caches/Desktop Pictures/{uuid}"
+    res = subprocess.run(["dscl", ".", "-read", f"/Users/{user}", "GeneratedUID"],
+                         capture_output=True, text=True)
+    if res.returncode != 0:
+        info(f"warning: dscl falló ({res.returncode}): {res.stderr.strip()}")
+        _log_to_file(f"poster: dscl failed rc={res.returncode} stderr={res.stderr.strip()}")
+        return False
+
+    uuid = res.stdout.split()[-1].strip()
+    if not uuid:
+        info("warning: dscl no devolvió UUID")
+        _log_to_file("poster: empty UUID")
+        return False
+
+    cache_dir = f"/Library/Caches/Desktop Pictures/{uuid}"
+    try:
         os.makedirs(cache_dir, exist_ok=True)
-        
-        lockscreen_png = os.path.join(cache_dir, "lockscreen.png")
-        
-        info("generando poster para arranque en frío...")
-        # Extraer el primer frame con ffmpeg
-        subprocess.run([
-            "ffmpeg", "-y", "-i", video_path, "-vframes", "1", "-update", "1", lockscreen_png
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-    except Exception as e:
-        info(f"warning: no se pudo actualizar el poster del login: {e}")
+    except OSError as e:
+        info(f"warning: no se pudo crear cache dir: {e}")
+        _log_to_file(f"poster: makedirs failed: {e}")
+        return False
+
+    lockscreen_png = os.path.join(cache_dir, "lockscreen.png")
+    # Mantener la extensión .png para que ffmpeg infiera el muxer correctamente
+    tmp_png = os.path.join(cache_dir, "lockscreen.new.png")
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        info("warning: ffmpeg no está en PATH, omito poster")
+        _log_to_file("poster: ffmpeg not found in PATH")
+        return False
+
+    info("generando poster para arranque en frío…")
+    # Escribir a un .tmp y luego renombrar — atómico, evita posters corruptos
+    res = subprocess.run(
+        [ffmpeg, "-y", "-loglevel", "error", "-i", video_path,
+         "-vframes", "1", "-update", "1", tmp_png],
+        capture_output=True, text=True
+    )
+    if res.returncode != 0:
+        info(f"warning: ffmpeg falló (rc={res.returncode})")
+        _log_to_file(f"poster: ffmpeg rc={res.returncode} stderr={res.stderr.strip()}")
+        try: os.unlink(tmp_png)
+        except OSError: pass
+        return False
+
+    try:
+        size = os.path.getsize(tmp_png)
+    except OSError:
+        size = 0
+    if size <= 0:
+        info("warning: ffmpeg no escribió ningún byte")
+        _log_to_file("poster: tmp file empty")
+        try: os.unlink(tmp_png)
+        except OSError: pass
+        return False
+
+    try:
+        os.replace(tmp_png, lockscreen_png)
+    except OSError as e:
+        info(f"warning: no se pudo renombrar el poster: {e}")
+        _log_to_file(f"poster: rename failed: {e}")
+        try: os.unlink(tmp_png)
+        except OSError: pass
+        return False
+
+    # Verificación final: el archivo final tiene el tamaño esperado y mtime fresco
+    try:
+        st = os.stat(lockscreen_png)
+        if st.st_size != size or (time.time() - st.st_mtime) > 60:
+            info("warning: el poster final no quedó actualizado")
+            _log_to_file(f"poster: post-check failed size={st.st_size} expected={size} mtime_age={time.time()-st.st_mtime:.0f}s")
+            return False
+    except OSError as e:
+        _log_to_file(f"poster: final stat failed: {e}")
+        return False
+
+    info(f"✓ poster regenerado ({size//1024} KB)")
+    _log_to_file(f"poster: ok {size} bytes -> {lockscreen_png}")
+    return True
 
 
 def restart_wallpaper_agent():
@@ -187,14 +258,18 @@ def cmd_install(video_path):
     info("copiando video al slot del sistema…")
     atomic_copy(video_path, aerial_path)
 
-    save_state(aerial_path, backup_path)
-
     # Ensure macOS Index.plist points to this aerial for the Idle (lock screen)
     configure_idle_plist(aerial_id)
-    update_cold_boot_poster(video_path)
+    poster_ok = update_cold_boot_poster(video_path)
     restart_wallpaper_agent()
 
-    info("✓ lock screen actualizado")
+    # Persistir el estado al final, una vez que sabemos qué pasó.
+    # Si el poster falló, igual guardamos estado pero loggeamos para diagnóstico.
+    save_state(aerial_path, backup_path)
+    if not poster_ok:
+        _log_to_file(f"install: poster regeneration failed for {video_path}")
+
+    info("✓ lock screen actualizado" + ("" if poster_ok else " (poster con warnings — ver engine.log)"))
 
 
 def cmd_restore():
@@ -208,10 +283,40 @@ def cmd_restore():
     if not os.path.exists(backup_path):
         die(f"no existe el backup: {backup_path}")
 
+    # Sanidad: backup razonablemente grande y reconocible como video por ffprobe
+    try:
+        backup_size = os.path.getsize(backup_path)
+    except OSError as e:
+        die(f"no se puede leer el backup: {e}")
+    if backup_size < 64 * 1024:
+        die(f"backup parece corrupto o truncado ({backup_size} bytes)")
+
+    ffprobe = shutil.which("ffprobe")
+    if ffprobe:
+        res = subprocess.run(
+            [ffprobe, "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=codec_name", "-of", "csv=p=0", backup_path],
+            capture_output=True, text=True
+        )
+        if res.returncode != 0 or not res.stdout.strip():
+            die(f"backup no parece un video válido (ffprobe: {res.stderr.strip() or 'sin stream'})")
+
+    # Copia atómica al slot
     info("restaurando aerial original…")
-    shutil.copy2(backup_path, aerial_path)
+    tmp = aerial_path + ".restore.tmp"
+    try:
+        shutil.copy2(backup_path, tmp)
+        os.replace(tmp, aerial_path)
+    except OSError as e:
+        try: os.unlink(tmp)
+        except OSError: pass
+        die(f"no se pudo restaurar: {e}")
+
     restart_wallpaper_agent()
-    os.unlink(STATE_FILE)
+    try:
+        os.unlink(STATE_FILE)
+    except OSError:
+        pass
     info("✓ aerial original restaurado")
 
 
