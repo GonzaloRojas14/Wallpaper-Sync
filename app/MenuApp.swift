@@ -3,20 +3,26 @@ import AVFoundation
 import QuartzCore
 
 // MARK: - Design Tokens
+//
+// Semantic, sistema-aware. Respetan modo claro/oscuro y el accent color
+// elegido por el usuario en Configuración del Sistema. Inspirado en el HIG
+// de macOS Tahoe (Liquid Glass): translucencia, deferencia al contenido,
+// poco color saturado en chrome.
 struct Theme {
-    static let bg        = NSColor(red: 0.08, green: 0.08, blue: 0.14, alpha: 1)
-    static let cardBg    = NSColor(red: 0.12, green: 0.12, blue: 0.20, alpha: 1)
-    static let cardHover = NSColor(red: 0.16, green: 0.16, blue: 0.26, alpha: 1)
-    static let accent    = NSColor(red: 0.55, green: 0.36, blue: 1.0, alpha: 1)
-    static let accent2   = NSColor(red: 0.91, green: 0.27, blue: 0.37, alpha: 1)
-    static let textPri   = NSColor.white
-    static let textSec   = NSColor(white: 1, alpha: 0.55)
-    static let cardRadius: CGFloat = 14
+    static var accent: NSColor    { NSColor.controlAccentColor }
+    static var accent2: NSColor   { NSColor.systemPink }
+    static var cardBg: NSColor    { NSColor(name: nil) { $0.name == .darkAqua ? NSColor(white: 1, alpha: 0.06) : NSColor(white: 0, alpha: 0.04) } }
+    static var cardHover: NSColor { NSColor(name: nil) { $0.name == .darkAqua ? NSColor(white: 1, alpha: 0.10) : NSColor(white: 0, alpha: 0.07) } }
+    static var cardBorder: NSColor { NSColor.separatorColor }
+    static var textPri: NSColor   { NSColor.labelColor }
+    static var textSec: NSColor   { NSColor.secondaryLabelColor }
+    static var textTer: NSColor   { NSColor.tertiaryLabelColor }
+    static let cardRadius: CGFloat = 16
     static let cardW: CGFloat = 240
     static let cardH: CGFloat = 175
     static let thumbH: CGFloat = 145
-    static let gap: CGFloat = 16
-    static let pad: CGFloat = 24
+    static let gap: CGFloat = 18
+    static let pad: CGFloat = 28
 }
 
 // MARK: - Thumbnail Cache
@@ -46,15 +52,18 @@ class ThumbCache {
 class WallpaperCard: NSView {
     let videoPath: String
     let videoName: String
-    var isActive: Bool = false { didSet { needsDisplay = true; updateBorder() } }
-    var isHovered: Bool = false { didSet { needsDisplay = true } }
+    var isActive: Bool = false { didSet { updateActiveState() } }
+    var isHovered: Bool = false { didSet { updateHoverState() } }
     var onClick: (() -> Void)?
     var onDelete: (() -> Void)?
     var thumbHeight: CGFloat = Theme.thumbH
 
+    private let thumbContainer = NSView()
     private let thumbView = NSImageView()
     private let nameLabel = NSTextField(labelWithString: "")
-    private let checkBadge = NSTextField(labelWithString: "✓")
+    private let activePill = NSView()
+    private let activeIcon = NSImageView()
+    private let activeText = NSTextField(labelWithString: "Activo")
     private var trackingArea: NSTrackingArea?
 
     init(path: String, name: String) {
@@ -63,37 +72,54 @@ class WallpaperCard: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = Theme.cardRadius
-        layer?.masksToBounds = true
-        layer?.borderWidth = 0
+        layer?.masksToBounds = false  // sombra fuera de bounds
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowOpacity = 0.18
+        layer?.shadowRadius = 10
+        layer?.shadowOffset = CGSize(width: 0, height: -3)
         setupViews()
         loadThumb()
     }
     required init?(coder: NSCoder) { fatalError() }
 
     private func setupViews() {
+        // Thumbnail clipped a esquinas redondeadas
+        thumbContainer.wantsLayer = true
+        thumbContainer.layer?.cornerRadius = Theme.cardRadius
+        thumbContainer.layer?.masksToBounds = true
+        thumbContainer.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.3).cgColor
+        addSubview(thumbContainer)
+
         thumbView.imageScaling = .scaleProportionallyUpOrDown
         thumbView.wantsLayer = true
-        thumbView.layer?.cornerRadius = Theme.cardRadius
-        thumbView.layer?.masksToBounds = true
         thumbView.layer?.contentsGravity = .resizeAspectFill
-        addSubview(thumbView)
+        thumbContainer.addSubview(thumbView)
 
         nameLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         nameLabel.textColor = Theme.textPri
         nameLabel.alignment = .center
         nameLabel.lineBreakMode = .byTruncatingTail
         nameLabel.maximumNumberOfLines = 1
-        addSubview(nameLabel)
         nameLabel.stringValue = videoName
+        addSubview(nameLabel)
 
-        checkBadge.font = NSFont.systemFont(ofSize: 14, weight: .bold)
-        checkBadge.textColor = .white
-        checkBadge.wantsLayer = true
-        checkBadge.layer?.backgroundColor = Theme.accent.cgColor
-        checkBadge.layer?.cornerRadius = 12
-        checkBadge.alignment = .center
-        checkBadge.isHidden = true
-        addSubview(checkBadge)
+        // Pill "Activo" — barra cápsula con SF Symbol play
+        activePill.wantsLayer = true
+        activePill.layer?.backgroundColor = Theme.accent.cgColor
+        activePill.layer?.cornerRadius = 10
+        activePill.isHidden = true
+        addSubview(activePill)
+
+        if let img = NSImage(systemSymbolName: "play.fill", accessibilityDescription: "Activo") {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 9, weight: .bold)
+            activeIcon.image = img.withSymbolConfiguration(cfg)
+            activeIcon.contentTintColor = .white
+        }
+        activePill.addSubview(activeIcon)
+
+        activeText.font = NSFont.systemFont(ofSize: 10, weight: .semibold)
+        activeText.textColor = .white
+        activePill.addSubview(activeText)
     }
 
     private func loadThumb() {
@@ -102,23 +128,50 @@ class WallpaperCard: NSView {
         }
     }
 
-    private func updateBorder() {
+    private func updateActiveState() {
         if isActive {
-            layer?.borderWidth = 3
+            layer?.borderWidth = 2
             layer?.borderColor = Theme.accent.cgColor
-            checkBadge.isHidden = false
+            activePill.isHidden = false
         } else {
             layer?.borderWidth = 0
-            checkBadge.isHidden = true
+            activePill.isHidden = true
         }
+        needsDisplay = true
+    }
+
+    private func updateHoverState() {
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.18
+            ctx.allowsImplicitAnimation = true
+            if isHovered {
+                layer?.shadowOpacity = 0.32
+                layer?.shadowRadius = 14
+                layer?.transform = CATransform3DMakeScale(1.025, 1.025, 1)
+            } else {
+                layer?.shadowOpacity = 0.18
+                layer?.shadowRadius = 10
+                layer?.transform = CATransform3DIdentity
+            }
+        }
+        needsDisplay = true
     }
 
     override func layout() {
         super.layout()
         let b = bounds
-        thumbView.frame = NSRect(x: 0, y: b.height - thumbHeight, width: b.width, height: thumbHeight)
-        nameLabel.frame = NSRect(x: 8, y: 2, width: b.width - 16, height: b.height - thumbHeight - 4)
-        checkBadge.frame = NSRect(x: b.width - 30, y: b.height - 30, width: 24, height: 24)
+        thumbContainer.frame = NSRect(x: 0, y: b.height - thumbHeight, width: b.width, height: thumbHeight)
+        thumbView.frame = thumbContainer.bounds
+        nameLabel.frame = NSRect(x: 10, y: 4, width: b.width - 20, height: b.height - thumbHeight - 6)
+
+        // Pill arriba a la derecha del thumbnail
+        let pillW: CGFloat = 64, pillH: CGFloat = 20
+        activePill.frame = NSRect(x: b.width - pillW - 8, y: b.height - pillH - 8, width: pillW, height: pillH)
+        activeIcon.frame = NSRect(x: 8, y: 5, width: 11, height: 11)
+        activeText.frame = NSRect(x: 22, y: 3, width: 38, height: 14)
+
+        // Sombra rebatida con shadowPath (perf + permite scaled transforms)
+        layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: Theme.cardRadius, cornerHeight: Theme.cardRadius, transform: nil)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -211,10 +264,12 @@ class MainController: NSObject {
         Bundle.main.resourceURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     }()
 
-    private let statusDot = NSView()
+    private let statusIcon = NSImageView()
     private let statusLabel = NSTextField(labelWithString: "")
     private let activeInfoLabel = NSTextField(labelWithString: "")
     private let powerSaveBtn = NSButton()
+    private let searchField = NSSearchField()
+    private var allCards: [WallpaperCard] = []
 
     override init() {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 880, height: 620),
@@ -223,103 +278,151 @@ class MainController: NSObject {
         super.init()
 
         window.title = "Wallpaper Sync"
-        window.minSize = NSSize(width: 560, height: 420)
+        window.minSize = NSSize(width: 640, height: 480)
         window.center()
         window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = true
-        window.appearance = NSAppearance(named: .darkAqua)
+        window.titleVisibility = .hidden
         window.collectionBehavior = [.fullScreenPrimary]
+        // No forzar darkAqua: dejamos que el sistema decida (Liquid Glass se ve
+        // bien en ambos modos). El usuario puede cambiarlo en System Settings.
 
         let cv = window.contentView!
         cv.wantsLayer = true
 
-        // Gradient background
-        let grad = CAGradientLayer()
-        grad.colors = [
-            NSColor(red: 0.06, green: 0.05, blue: 0.13, alpha: 1).cgColor,
-            NSColor(red: 0.10, green: 0.08, blue: 0.19, alpha: 1).cgColor,
-            NSColor(red: 0.07, green: 0.06, blue: 0.15, alpha: 1).cgColor,
-        ]
-        grad.startPoint = CGPoint(x: 0, y: 1)
-        grad.endPoint = CGPoint(x: 1, y: 0)
-        grad.frame = cv.bounds
-        grad.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
-        cv.layer = CALayer()
-        cv.wantsLayer = true
-        cv.layer?.addSublayer(grad)
+        // Capa base translúcida — material idiomático de macOS Tahoe
+        let bgEffect = NSVisualEffectView(frame: cv.bounds)
+        bgEffect.autoresizingMask = [.width, .height]
+        bgEffect.material = .underWindowBackground
+        bgEffect.blendingMode = .behindWindow
+        bgEffect.state = .followsWindowActiveState
+        cv.addSubview(bgEffect)
 
-        // Glow orbs for depth
-        let orbData: [(NSColor, CGFloat, CGFloat, CGFloat)] = [
-            (NSColor(red:0.40,green:0.20,blue:0.85,alpha:0.10), -60, -30, 450),
-            (NSColor(red:0.75,green:0.15,blue:0.45,alpha:0.06), 600, 250, 500),
-            (NSColor(red:0.15,green:0.50,blue:0.90,alpha:0.07), 250, -60, 380),
-        ]
-        for (c, ox, oy, s) in orbData {
-            let orb = CAGradientLayer()
-            orb.type = .radial
-            orb.colors = [c.cgColor, NSColor.clear.cgColor]
-            orb.frame = CGRect(x: ox, y: oy, width: s, height: s)
-            orb.startPoint = CGPoint(x: 0.5, y: 0.5)
-            orb.endPoint = CGPoint(x: 1, y: 1)
-            grad.addSublayer(orb)
-        }
-
-        // Header with Glassmorphism
-        let header = NSVisualEffectView(frame: NSRect(x: 0, y: cv.bounds.height - 52, width: cv.bounds.width, height: 52))
+        // Header — material headerView, alineado debajo del titlebar nativo
+        let headerH: CGFloat = 56
+        let header = NSVisualEffectView(frame: NSRect(x: 0, y: cv.bounds.height - headerH, width: cv.bounds.width, height: headerH))
         header.autoresizingMask = [.width, .minYMargin]
-        header.material = .sidebar
+        header.material = .headerView
         header.blendingMode = .withinWindow
         header.state = .active
         cv.addSubview(header)
 
-        // Power Save Button
+        // Separador hairline debajo del header
+        let headerSep = NSBox(frame: NSRect(x: 0, y: 0, width: cv.bounds.width, height: 1))
+        headerSep.boxType = .custom
+        headerSep.borderWidth = 0
+        headerSep.fillColor = NSColor.separatorColor
+        headerSep.autoresizingMask = [.width]
+        header.addSubview(headerSep)
+
+        // Título — agrupado con icono de app
+        let titleIcon = NSImageView()
+        if let img = NSImage(systemSymbolName: "play.rectangle.fill", accessibilityDescription: nil) {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+            titleIcon.image = img.withSymbolConfiguration(cfg)
+            titleIcon.contentTintColor = Theme.accent
+        }
+        titleIcon.frame = NSRect(x: 24, y: 18, width: 22, height: 22)
+        header.addSubview(titleIcon)
+
+        let titleLabel = NSTextField(labelWithString: "Biblioteca")
+        titleLabel.font = NSFont.systemFont(ofSize: 16, weight: .semibold)
+        titleLabel.textColor = Theme.textPri
+        titleLabel.frame = NSRect(x: 54, y: 18, width: 200, height: 22)
+        header.addSubview(titleLabel)
+
+        // Search field — filtrado en vivo
+        searchField.placeholderString = "Buscar wallpapers"
+        searchField.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+        searchField.target = self
+        searchField.action = #selector(searchChanged)
+        searchField.sendsSearchStringImmediately = true
+        searchField.sendsWholeSearchString = false
+        searchField.frame = NSRect(x: 260, y: 16, width: 240, height: 24)
+        searchField.autoresizingMask = [.width]
+        header.addSubview(searchField)
+
+        // Power save — switch nativo con icono bolt
+        let psBolt = NSImageView()
+        if let img = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil) {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+            psBolt.image = img.withSymbolConfiguration(cfg)
+            psBolt.contentTintColor = Theme.textSec
+        }
+        psBolt.frame = NSRect(x: cv.bounds.width - 290, y: 20, width: 14, height: 16)
+        psBolt.autoresizingMask = [.minXMargin]
+        header.addSubview(psBolt)
+
+        let psLabel = NSTextField(labelWithString: "Ahorro")
+        psLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        psLabel.textColor = Theme.textSec
+        psLabel.frame = NSRect(x: cv.bounds.width - 272, y: 20, width: 60, height: 16)
+        psLabel.autoresizingMask = [.minXMargin]
+        header.addSubview(psLabel)
+
         powerSaveBtn.setButtonType(.switch)
-        powerSaveBtn.title = "Ahorro de Energía"
-        powerSaveBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        if #available(macOS 10.15, *) {
+            powerSaveBtn.controlSize = .small
+        }
+        powerSaveBtn.title = ""
         powerSaveBtn.target = self
         powerSaveBtn.action = #selector(togglePowerSaveHUD)
-        powerSaveBtn.frame = NSRect(x: cv.bounds.width - 280, y: 16, width: 140, height: 20)
+        powerSaveBtn.frame = NSRect(x: cv.bounds.width - 210, y: 20, width: 30, height: 16)
         powerSaveBtn.autoresizingMask = [.minXMargin]
         header.addSubview(powerSaveBtn)
 
-        let importBtn = NSButton(title: "＋ Importar", target: self, action: #selector(importVideo))
+        // Botón Importar — borderedProminent style HIG-compliant
+        let importBtn = NSButton(title: "  Importar", target: self, action: #selector(importVideo))
         importBtn.bezelStyle = .rounded
-        importBtn.wantsLayer = true
-        importBtn.layer?.backgroundColor = Theme.accent.cgColor
-        importBtn.layer?.cornerRadius = 8
-        importBtn.contentTintColor = .white
+        if #available(macOS 11.0, *) {
+            importBtn.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)
+            importBtn.imagePosition = .imageLeading
+            importBtn.imageScaling = .scaleProportionallyDown
+        }
+        importBtn.controlSize = .regular
         importBtn.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-        importBtn.frame = NSRect(x: cv.bounds.width - 120, y: 12, width: 100, height: 28)
+        if #available(macOS 11.0, *) {
+            importBtn.bezelColor = Theme.accent
+        }
+        importBtn.contentTintColor = .white
+        importBtn.frame = NSRect(x: cv.bounds.width - 130, y: 16, width: 110, height: 26)
         importBtn.autoresizingMask = [.minXMargin]
         header.addSubview(importBtn)
 
-        // Bottom status bar with Glassmorphism
-        let bottomBar = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: cv.bounds.width, height: 32))
+        // Bottom bar — material translúcido + separador
+        let bottomH: CGFloat = 36
+        let bottomBar = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: cv.bounds.width, height: bottomH))
         bottomBar.autoresizingMask = [.width, .maxYMargin]
-        bottomBar.material = .sidebar
+        bottomBar.material = .titlebar
         bottomBar.blendingMode = .withinWindow
         bottomBar.state = .active
         cv.addSubview(bottomBar)
 
-        statusDot.wantsLayer = true
-        statusDot.layer?.cornerRadius = 4
-        statusDot.frame = NSRect(x: 12, y: 10, width: 8, height: 8)
-        bottomBar.addSubview(statusDot)
+        let bottomSep = NSBox(frame: NSRect(x: 0, y: bottomH - 1, width: cv.bounds.width, height: 1))
+        bottomSep.boxType = .custom
+        bottomSep.borderWidth = 0
+        bottomSep.fillColor = NSColor.separatorColor
+        bottomSep.autoresizingMask = [.width]
+        bottomBar.addSubview(bottomSep)
 
-        statusLabel.font = NSFont.systemFont(ofSize: 10.5, weight: .medium)
+        // Estado del motor: SF Symbol semántico (verde/rojo).
+        statusIcon.frame = NSRect(x: 14, y: 10, width: 14, height: 14)
+        bottomBar.addSubview(statusIcon)
+
+        statusLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         statusLabel.textColor = Theme.textSec
-        statusLabel.frame = NSRect(x: 26, y: 6, width: 120, height: 16)
+        statusLabel.frame = NSRect(x: 32, y: 10, width: 130, height: 14)
         bottomBar.addSubview(statusLabel)
 
-        activeInfoLabel.font = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
-        activeInfoLabel.textColor = NSColor(white: 1, alpha: 0.4)
+        activeInfoLabel.font = NSFont.monospacedSystemFont(ofSize: 10.5, weight: .regular)
+        activeInfoLabel.textColor = Theme.textTer
         activeInfoLabel.alignment = .center
-        activeInfoLabel.frame = NSRect(x: 150, y: 6, width: cv.bounds.width - 180, height: 16)
+        activeInfoLabel.frame = NSRect(x: 170, y: 10, width: cv.bounds.width - 200, height: 14)
         activeInfoLabel.autoresizingMask = [.width]
         bottomBar.addSubview(activeInfoLabel)
 
-        // Scroll + Grid
-        scrollView.frame = NSRect(x: 0, y: 32, width: cv.bounds.width, height: cv.bounds.height - 52 - 32)
+        // Scroll + Grid (entre header y bottom)
+        scrollView.frame = NSRect(x: 0, y: bottomH, width: cv.bounds.width, height: cv.bounds.height - headerH - bottomH)
         scrollView.autoresizingMask = [.width, .height]
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = false
@@ -329,6 +432,15 @@ class MainController: NSObject {
         cv.addSubview(scrollView)
 
         reloadLibrary()
+    }
+
+    @objc func searchChanged() {
+        let q = searchField.stringValue.trimmingCharacters(in: .whitespaces).lowercased()
+        gridView.cards.forEach { $0.removeFromSuperview() }
+        let filtered = q.isEmpty ? allCards : allCards.filter { $0.videoName.lowercased().contains(q) }
+        gridView.cards = filtered
+        filtered.forEach { gridView.addSubview($0) }
+        gridView.layoutCards()
     }
 
     func reloadLibrary() {
@@ -347,6 +459,7 @@ class MainController: NSObject {
         // Clear
         gridView.cards.forEach { $0.removeFromSuperview() }
         gridView.cards.removeAll()
+        allCards.removeAll()
         gridView.bannerView?.removeFromSuperview()
         gridView.bannerView = nil
 
@@ -354,13 +467,16 @@ class MainController: NSObject {
         let files = (try? FileManager.default.contentsOfDirectory(atPath: libPath)) ?? []
         let movFiles = files.filter { $0.hasSuffix(".mov") }.sorted()
 
-        // Engine status in bottom bar
+        // Estado del motor — SF Symbol con color semántico
         let engineRunning = (try? String(contentsOfFile: appSupportURL.appendingPathComponent("logs/engine.pid").path))
             .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
             .map { kill(Int32($0), 0) == 0 } ?? false
-        statusDot.layer?.backgroundColor = engineRunning
-            ? NSColor(red: 0.3, green: 0.9, blue: 0.5, alpha: 1).cgColor
-            : NSColor(red: 0.9, green: 0.3, blue: 0.3, alpha: 1).cgColor
+        let symbolName = engineRunning ? "circle.fill" : "exclamationmark.circle.fill"
+        if let img = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+            statusIcon.image = img.withSymbolConfiguration(cfg)
+            statusIcon.contentTintColor = engineRunning ? NSColor.systemGreen : NSColor.systemRed
+        }
         statusLabel.stringValue = engineRunning ? "Motor activo" : "Motor detenido"
 
         // Active video info in bottom bar
@@ -392,6 +508,14 @@ class MainController: NSObject {
             card.onDelete = { [weak self] in self?.deleteWallpaper(name) }
             gridView.addSubview(card)
             gridView.cards.append(card)
+            allCards.append(card)
+        }
+        // Reaplica el filtro actual de búsqueda sobre las nuevas cards
+        let q = searchField.stringValue.trimmingCharacters(in: .whitespaces).lowercased()
+        if !q.isEmpty {
+            let visible = allCards.filter { $0.videoName.lowercased().contains(q) }
+            allCards.filter { !visible.contains($0) }.forEach { $0.removeFromSuperview() }
+            gridView.cards = visible
         }
 
         // Check if aerial is set up
@@ -403,20 +527,24 @@ class MainController: NSObject {
 
         if !hasAerial {
             let banner = makeBanner(
-                icon: "⚠️",
+                symbol: "exclamationmark.triangle.fill",
+                tint: NSColor.systemYellow,
                 title: "Configuración necesaria para la pantalla de bloqueo",
-                body: "1. Abrí Configuración del Sistema → Fondo de Pantalla\n2. Buscá un fondo animado (ej: \"Tahoe Day\")\n3. Hacé click en \"Descargar\" (ícono de nube ☁️)\n4. Activá \"Mostrar como salvapantallas\"",
+                body: "1. Abrí Configuración del Sistema → Fondo de Pantalla\n2. Buscá un fondo animado (ej: \"Tahoe Day\")\n3. Hacé click en \"Descargar\" (ícono de nube)\n4. Activá \"Mostrar como salvapantallas\"",
                 buttonTitle: "Abrir Configuración",
+                buttonSymbol: "gear",
                 action: #selector(openWallpaperSettings)
             )
             gridView.bannerView = banner
             gridView.addSubview(banner)
         } else if movFiles.isEmpty {
             let emptyBanner = makeBanner(
-                icon: "🎬",
+                symbol: "tray.fill",
+                tint: Theme.accent,
                 title: "Tu biblioteca está vacía",
                 body: "Importá un video (.mp4, .mov, .gif) para usarlo como wallpaper animado.",
-                buttonTitle: "＋ Importar Video",
+                buttonTitle: "Importar Video",
+                buttonSymbol: "plus",
                 action: #selector(importVideo)
             )
             gridView.bannerView = emptyBanner
@@ -426,41 +554,58 @@ class MainController: NSObject {
         gridView.layoutCards()
     }
 
-    private func makeBanner(icon: String, title: String, body: String, buttonTitle: String, action: Selector) -> NSView {
-        let banner = NSView(frame: NSRect(x: 0, y: 0, width: 100, height: 160))
+    private func makeBanner(symbol: String, tint: NSColor, title: String, body: String, buttonTitle: String, buttonSymbol: String?, action: Selector) -> NSView {
+        let banner = NSView(frame: NSRect(x: 0, y: 0, width: 100, height: 168))
         banner.wantsLayer = true
-        banner.layer?.backgroundColor = NSColor(red: 0.18, green: 0.15, blue: 0.30, alpha: 1).cgColor
-        banner.layer?.cornerRadius = 12
+        banner.layer?.backgroundColor = Theme.cardBg.cgColor
+        banner.layer?.cornerRadius = 14
         banner.layer?.borderWidth = 1
-        banner.layer?.borderColor = Theme.accent.withAlphaComponent(0.3).cgColor
+        banner.layer?.borderColor = tint.withAlphaComponent(0.35).cgColor
 
-        let iconLabel = NSTextField(labelWithString: icon)
-        iconLabel.font = NSFont.systemFont(ofSize: 28)
-        iconLabel.frame = NSRect(x: 16, y: 120, width: 40, height: 36)
-        banner.addSubview(iconLabel)
+        // Pastilla del símbolo a la izquierda
+        let symbolBg = NSView()
+        symbolBg.wantsLayer = true
+        symbolBg.layer?.backgroundColor = tint.withAlphaComponent(0.15).cgColor
+        symbolBg.layer?.cornerRadius = 10
+        symbolBg.frame = NSRect(x: 18, y: 116, width: 36, height: 36)
+        banner.addSubview(symbolBg)
+
+        let symView = NSImageView()
+        if let img = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+            symView.image = img.withSymbolConfiguration(cfg)
+            symView.contentTintColor = tint
+        }
+        symView.frame = NSRect(x: 26, y: 124, width: 22, height: 22)
+        banner.addSubview(symView)
 
         let titleLabel = NSTextField(labelWithString: title)
-        titleLabel.font = NSFont.systemFont(ofSize: 15, weight: .bold)
+        titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
         titleLabel.textColor = Theme.textPri
-        titleLabel.frame = NSRect(x: 56, y: 124, width: 600, height: 24)
+        titleLabel.frame = NSRect(x: 64, y: 128, width: 600, height: 20)
         banner.addSubview(titleLabel)
 
         let bodyLabel = NSTextField(wrappingLabelWithString: body)
         bodyLabel.font = NSFont.systemFont(ofSize: 12)
         bodyLabel.textColor = Theme.textSec
-        bodyLabel.frame = NSRect(x: 16, y: 36, width: 700, height: 84)
+        bodyLabel.frame = NSRect(x: 18, y: 40, width: 700, height: 80)
         bodyLabel.maximumNumberOfLines = 10
         bodyLabel.usesSingleLineMode = false
         banner.addSubview(bodyLabel)
 
-        let btn = NSButton(title: buttonTitle, target: self, action: action)
+        let btn = NSButton(title: buttonSymbol == nil ? buttonTitle : "  " + buttonTitle,
+                           target: self, action: action)
         btn.bezelStyle = .rounded
-        btn.wantsLayer = true
-        btn.layer?.backgroundColor = Theme.accent.cgColor
-        btn.layer?.cornerRadius = 6
-        btn.contentTintColor = .white
         btn.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-        btn.frame = NSRect(x: 16, y: 6, width: 180, height: 26)
+        if #available(macOS 11.0, *) {
+            if let s = buttonSymbol, let img = NSImage(systemSymbolName: s, accessibilityDescription: nil) {
+                btn.image = img
+                btn.imagePosition = .imageLeading
+            }
+            btn.bezelColor = Theme.accent
+        }
+        btn.contentTintColor = .white
+        btn.frame = NSRect(x: 18, y: 8, width: 200, height: 28)
         banner.addSubview(btn)
 
         return banner
@@ -543,10 +688,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         mainController = MainController()
         mainController.window.delegate = self
 
-        // Menu bar icon
+        // Menu bar icon — SF Symbol monocromo, se adapta a la barra clara/oscura
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let btn = statusItem.button {
-            btn.title = "🎬"
+            if #available(macOS 11.0, *),
+               let img = NSImage(systemSymbolName: "play.rectangle.fill", accessibilityDescription: "Wallpaper Sync") {
+                let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+                let configured = img.withSymbolConfiguration(cfg) ?? img
+                configured.isTemplate = true
+                btn.image = configured
+            } else {
+                btn.title = "🎬"
+            }
             btn.action = #selector(statusItemClicked(_:))
             btn.target = self
             btn.sendAction(on: [.leftMouseUp, .rightMouseUp])

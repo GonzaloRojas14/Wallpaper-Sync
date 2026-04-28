@@ -5,6 +5,7 @@
 
 # Build artifacts
 app/WallpaperEngine
+app/WallpaperMenu
 Wallpaper Sync.app/
 
 # User data (these live in ~/Library/Application Support/WallpaperSync/)

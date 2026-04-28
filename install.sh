@@ -10,6 +10,19 @@ echo "·· compilando WallpaperEngine…"
   -framework Cocoa -framework AVFoundation -framework AVKit -framework IOKit \
   -o "$ROOT/app/WallpaperEngine" "$ROOT/app/WallpaperEngine.swift"
 
+echo "·· compilando WallpaperMenu (HUD)…"
+/usr/bin/swiftc -O -whole-module-optimization \
+  -framework Cocoa -framework AVFoundation -framework QuartzCore \
+  -o "$ROOT/app/WallpaperMenu" "$ROOT/app/MenuApp.swift"
+
+# Sincronizar artefactos al .app empaquetado del repo
+if [ -d "$ROOT/Wallpaper Sync.app" ]; then
+  cp -f "$ROOT/app/WallpaperEngine" "$ROOT/Wallpaper Sync.app/Contents/Resources/app/WallpaperEngine"
+  cp -f "$ROOT/app/WallpaperMenu"   "$ROOT/Wallpaper Sync.app/Contents/MacOS/WallpaperMenu"
+  cp -f "$ROOT/bin/wallpaper"       "$ROOT/Wallpaper Sync.app/Contents/Resources/bin/wallpaper"
+  cp -f "$ROOT/bin/_set_lockscreen_video.py" "$ROOT/Wallpaper Sync.app/Contents/Resources/bin/_set_lockscreen_video.py"
+fi
+
 chmod +x "$ROOT/bin/wallpaper"
 
 if [ ! -f "$ROOT/config.json" ]; then
