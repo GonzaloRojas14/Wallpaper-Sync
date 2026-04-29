@@ -2,9 +2,13 @@
 
 Animated wallpaper engine for macOS Sonoma & Sequoia. Sets the same video as both your **desktop background** and **lock screen** simultaneously.
 
-![macOS](https://img.shields.io/badge/macOS-Sonoma%20%7C%20Sequoia-blue)
-![Swift](https://img.shields.io/badge/Swift-5.9-orange)
-![License](https://img.shields.io/badge/license-MIT-green)
+[![macOS](https://img.shields.io/badge/macOS-Sonoma%20%7C%20Sequoia%20%7C%20Tahoe-blue)](#requirements)
+[![Swift](https://img.shields.io/badge/Swift-5.9-orange)](#)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Donate](https://img.shields.io/badge/donar-ceneka-ff5f5f)](https://ceneka.net/gonza_007)
+[![Instagram](https://img.shields.io/badge/Instagram-%40gonza._007-E4405F?logo=instagram&logoColor=white)](https://instagram.com/gonza._007)
+
+> Hecho por **Gonzalo Rojas** ([@gonza._007](https://instagram.com/gonza._007)). Si te resulta útil y querés invitarme un café: **[ceneka.net/gonza_007](https://ceneka.net/gonza_007)** ☕
 
 ## Features
 
@@ -19,9 +23,9 @@ Animated wallpaper engine for macOS Sonoma & Sequoia. Sets the same video as bot
 ## Installation
 
 ### Download
-1. Download `WallpaperSync-2.0.dmg` from [Releases](https://github.com/GonzaloRojas14/Wallpaper-Sync/releases)
+1. Download the latest `WallpaperSync-X.Y.dmg` from [Releases](https://github.com/GonzaloRojas14/Wallpaper-Sync/releases)
 2. Open the DMG and drag **Wallpaper Sync** to Applications
-3. Right-click → **Open** (first time only, since the app is not notarized)
+3. Right-click → **Open** (first time only, since the app is not notarized — no tengo Apple Developer ID, así que macOS te muestra el aviso de "developer no identificado")
 
 ### First-time Setup
 1. The app will offer to install `ffmpeg` if not already present
@@ -110,6 +114,15 @@ wallpaper status              # Show current config
 
 > **Tip:** Enable `wallpaper battery on` to auto-pause when unplugged.
 
+## Author
+
+**Gonzalo Rojas**
+- 📷 Instagram: [@gonza._007](https://instagram.com/gonza._007)
+- ☕ Donaciones: [ceneka.net/gonza_007](https://ceneka.net/gonza_007)
+- 🐙 GitHub: [@GonzaloRojas14](https://github.com/GonzaloRojas14)
+
+Si Wallpaper Sync te ahorró tiempo o te gustó cómo quedó tu Mac, considerá invitarme un café — el desarrollo es 100% en tiempo libre y cualquier aporte motiva a seguir mejorándolo.
+
 ## License
 
-MIT
+MIT — © 2026 Gonzalo Rojas. Ver [LICENSE](LICENSE).

@@ -1,0 +1,3 @@
+# Configuración del botón "Sponsor" del repo en GitHub.
+# Soporta múltiples plataformas; acá usamos Ceneka como URL custom.
+custom: ['https://ceneka.net/gonza_007']

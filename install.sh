@@ -19,6 +19,7 @@ echo "·· compilando WallpaperMenu (HUD)…"
 if [ -d "$ROOT/Wallpaper Sync.app" ]; then
   cp -f "$ROOT/app/WallpaperEngine" "$ROOT/Wallpaper Sync.app/Contents/Resources/app/WallpaperEngine"
   cp -f "$ROOT/app/WallpaperMenu"   "$ROOT/Wallpaper Sync.app/Contents/MacOS/WallpaperMenu"
+  cp -f "$ROOT/app/Info.plist"      "$ROOT/Wallpaper Sync.app/Contents/Info.plist"
   cp -f "$ROOT/bin/wallpaper"       "$ROOT/Wallpaper Sync.app/Contents/Resources/bin/wallpaper"
   cp -f "$ROOT/bin/_set_lockscreen_video.py" "$ROOT/Wallpaper Sync.app/Contents/Resources/bin/_set_lockscreen_video.py"
 fi

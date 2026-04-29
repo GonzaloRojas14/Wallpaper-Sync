@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>WallpaperMenu</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.wallpapersync.app</string>
+    <key>CFBundleName</key>
+    <string>Wallpaper Sync</string>
+    <key>CFBundleDisplayName</key>
+    <string>Wallpaper Sync</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>2.1</string>
+    <key>CFBundleVersion</key>
+    <string>2.1</string>
+    <key>CFBundleGetInfoString</key>
+    <string>Wallpaper Sync 2.1, © 2026 Gonzalo Rojas</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 Gonzalo Rojas. Liberado bajo licencia MIT.</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSUIElement</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>
