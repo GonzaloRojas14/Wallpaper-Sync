@@ -278,7 +278,10 @@ class MainController: NSObject {
         super.init()
 
         window.title = "Wallpaper Sync"
-        window.minSize = NSSize(width: 640, height: 480)
+        // Min width 760 deja espacio para traffic lights + título + search +
+        // controles de la derecha sin solapamiento. Por debajo de eso ocultamos
+        // el search field dinámicamente.
+        window.minSize = NSSize(width: 760, height: 500)
         window.center()
         window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = true
@@ -315,30 +318,35 @@ class MainController: NSObject {
         headerSep.autoresizingMask = [.width]
         header.addSubview(headerSep)
 
-        // Título — agrupado con icono de app
+        // Título — empieza después de las traffic lights (≈ x=78) para no
+        // taparlas. La columna izquierda del header reserva 0–250 para
+        // [icono · "Biblioteca"]; el search ocupa el centro flexible.
+        let titleX: CGFloat = 84
         let titleIcon = NSImageView()
         if let img = NSImage(systemSymbolName: "play.rectangle.fill", accessibilityDescription: nil) {
             let cfg = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
             titleIcon.image = img.withSymbolConfiguration(cfg)
             titleIcon.contentTintColor = Theme.accent
         }
-        titleIcon.frame = NSRect(x: 24, y: 18, width: 22, height: 22)
+        titleIcon.frame = NSRect(x: titleX, y: 18, width: 22, height: 22)
         header.addSubview(titleIcon)
 
         let titleLabel = NSTextField(labelWithString: "Biblioteca")
         titleLabel.font = NSFont.systemFont(ofSize: 16, weight: .semibold)
         titleLabel.textColor = Theme.textPri
-        titleLabel.frame = NSRect(x: 54, y: 18, width: 200, height: 22)
+        titleLabel.frame = NSRect(x: titleX + 30, y: 18, width: 140, height: 22)
         header.addSubview(titleLabel)
 
-        // Search field — filtrado en vivo
+        // Search field — flex center. Crece con la ventana via .width mask.
+        // En ventanas chicas se oculta en updateHeaderLayout().
         searchField.placeholderString = "Buscar wallpapers"
         searchField.font = NSFont.systemFont(ofSize: 12, weight: .regular)
         searchField.target = self
         searchField.action = #selector(searchChanged)
         searchField.sendsSearchStringImmediately = true
         searchField.sendsWholeSearchString = false
-        searchField.frame = NSRect(x: 260, y: 16, width: 240, height: 24)
+        let searchLeft: CGFloat = titleX + 30 + 150  // = 264
+        searchField.frame = NSRect(x: searchLeft, y: 16, width: max(180, cv.bounds.width - searchLeft - 310), height: 24)
         searchField.autoresizingMask = [.width]
         header.addSubview(searchField)
 
@@ -427,11 +435,33 @@ class MainController: NSObject {
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = false
         scrollView.scrollerStyle = .overlay
-        gridView.frame = NSRect(x: 0, y: 0, width: scrollView.bounds.width, height: 800)
+        gridView.frame = NSRect(x: 0, y: 0, width: scrollView.contentView.bounds.width, height: 800)
         scrollView.documentView = gridView
         cv.addSubview(scrollView)
 
+        // Hacer que el documentView siga el ancho del clipView — sin esto, en
+        // fullscreen el grid se queda con el ancho inicial y deja espacio
+        // muerto a la derecha en lugar de meter más columnas.
+        scrollView.contentView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(syncGridWidth),
+            name: NSView.frameDidChangeNotification,
+            object: scrollView.contentView
+        )
+
         reloadLibrary()
+        // Ancho inicial correcto incluso si la ventana arrancó más grande
+        // que el frame de design.
+        DispatchQueue.main.async { [weak self] in self?.syncGridWidth() }
+    }
+
+    @objc private func syncGridWidth() {
+        let w = scrollView.contentView.bounds.width
+        guard w > 0, abs(gridView.frame.width - w) > 0.5 else { return }
+        var f = gridView.frame
+        f.size.width = w
+        gridView.frame = f
+        gridView.layoutCards()
     }
 
     @objc func searchChanged() {
