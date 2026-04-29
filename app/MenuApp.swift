@@ -642,6 +642,7 @@ class MainController: NSObject {
 
     private func showAerialSetupOverlay() {
         if aerialSetupOverlay != nil { return }
+        FileHandle.standardError.write("[hud] aerial setup overlay shown\n".data(using: .utf8)!)
         let cv = window.contentView!
 
         // Backdrop translúcido que cubre toda la ventana — material
@@ -762,6 +763,8 @@ class MainController: NSObject {
     }
 
     private func hideAerialSetupOverlay() {
+        guard aerialSetupOverlay != nil else { return }
+        FileHandle.standardError.write("[hud] aerial setup overlay hidden\n".data(using: .utf8)!)
         aerialSetupOverlay?.removeFromSuperview()
         aerialSetupOverlay = nil
     }
