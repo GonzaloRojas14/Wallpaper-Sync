@@ -252,6 +252,7 @@ class MainController: NSObject {
     private let scrollView = NSScrollView()
     private let gridView = GridView()
     private var activeName = ""
+    private var aerialSetupOverlay: NSView?
 
     lazy var appSupportURL: URL = {
         let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -556,18 +557,14 @@ class MainController: NSObject {
         }
 
         if !hasAerial {
-            let banner = makeBanner(
-                symbol: "exclamationmark.triangle.fill",
-                tint: NSColor.systemYellow,
-                title: "Configuración necesaria para la pantalla de bloqueo",
-                body: "1. Abrí Configuración del Sistema → Fondo de Pantalla\n2. Buscá un fondo animado (ej: \"Tahoe Day\")\n3. Hacé click en \"Descargar\" (ícono de nube)\n4. Activá \"Mostrar como salvapantallas\"",
-                buttonTitle: "Abrir Configuración",
-                buttonSymbol: "gear",
-                action: #selector(openWallpaperSettings)
-            )
-            gridView.bannerView = banner
-            gridView.addSubview(banner)
-        } else if movFiles.isEmpty {
+            // Overlay modal con fondo blurreado: bloquea visualmente la app
+            // hasta que el usuario configure el aerial. El banner inline
+            // quedaba demasiado tímido y la gente lo ignoraba.
+            showAerialSetupOverlay()
+        } else {
+            hideAerialSetupOverlay()
+        }
+        if hasAerial && movFiles.isEmpty {
             let emptyBanner = makeBanner(
                 symbol: "tray.fill",
                 tint: Theme.accent,
@@ -639,6 +636,134 @@ class MainController: NSObject {
         banner.addSubview(btn)
 
         return banner
+    }
+
+    // MARK: - Aerial setup overlay (modal con backdrop blurreado)
+
+    private func showAerialSetupOverlay() {
+        if aerialSetupOverlay != nil { return }
+        let cv = window.contentView!
+
+        // Backdrop translúcido que cubre toda la ventana — material
+        // .fullScreenUI dispara el blur agresivo idiomático de macOS.
+        let overlay = NSVisualEffectView(frame: cv.bounds)
+        overlay.autoresizingMask = [.width, .height]
+        overlay.material = .fullScreenUI
+        overlay.blendingMode = .withinWindow
+        overlay.state = .active
+        overlay.wantsLayer = true
+
+        // Eater de clicks: evita que se interactúe con la grilla detrás.
+        let eater = NSView(frame: overlay.bounds)
+        eater.autoresizingMask = [.width, .height]
+        overlay.addSubview(eater)
+
+        // Tarjeta central
+        let cardW: CGFloat = 480
+        let cardH: CGFloat = 380
+        let card = NSView(frame: NSRect(
+            x: (overlay.bounds.width - cardW) / 2,
+            y: (overlay.bounds.height - cardH) / 2,
+            width: cardW, height: cardH))
+        card.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
+        card.wantsLayer = true
+        card.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.9).cgColor
+        card.layer?.cornerRadius = 18
+        card.layer?.borderWidth = 1
+        card.layer?.borderColor = NSColor.separatorColor.cgColor
+        card.layer?.shadowColor = NSColor.black.cgColor
+        card.layer?.shadowOpacity = 0.35
+        card.layer?.shadowRadius = 32
+        card.layer?.shadowOffset = CGSize(width: 0, height: -8)
+        card.layer?.masksToBounds = false
+        card.layer?.shadowPath = CGPath(roundedRect: card.bounds, cornerWidth: 18, cornerHeight: 18, transform: nil)
+        overlay.addSubview(card)
+
+        // Pastilla del símbolo
+        let symbolBgSize: CGFloat = 64
+        let symbolBg = NSView(frame: NSRect(
+            x: (cardW - symbolBgSize) / 2,
+            y: cardH - 92,
+            width: symbolBgSize, height: symbolBgSize))
+        symbolBg.wantsLayer = true
+        symbolBg.layer?.backgroundColor = NSColor.systemYellow.withAlphaComponent(0.18).cgColor
+        symbolBg.layer?.cornerRadius = 16
+        card.addSubview(symbolBg)
+
+        let symView = NSImageView()
+        if let img = NSImage(systemSymbolName: "moon.stars.fill", accessibilityDescription: nil) {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 30, weight: .medium)
+            symView.image = img.withSymbolConfiguration(cfg)
+            symView.contentTintColor = NSColor.systemYellow
+        }
+        symView.frame = NSRect(x: (cardW - 36) / 2, y: cardH - 78, width: 36, height: 36)
+        card.addSubview(symView)
+
+        // Título
+        let title = NSTextField(labelWithString: "Configurá la pantalla de bloqueo")
+        title.font = NSFont.systemFont(ofSize: 18, weight: .semibold)
+        title.textColor = Theme.textPri
+        title.alignment = .center
+        title.frame = NSRect(x: 24, y: cardH - 134, width: cardW - 48, height: 26)
+        card.addSubview(title)
+
+        // Subtítulo
+        let subtitle = NSTextField(labelWithString: "Para sincronizar el video con tu lock screen, macOS necesita un fondo aerial descargado.")
+        subtitle.font = NSFont.systemFont(ofSize: 13)
+        subtitle.textColor = Theme.textSec
+        subtitle.alignment = .center
+        subtitle.maximumNumberOfLines = 3
+        subtitle.usesSingleLineMode = false
+        subtitle.lineBreakMode = .byWordWrapping
+        subtitle.frame = NSRect(x: 32, y: cardH - 188, width: cardW - 64, height: 44)
+        card.addSubview(subtitle)
+
+        // Pasos numerados
+        let steps: [(String, String)] = [
+            ("1", "Abrí Configuración del Sistema → Fondo de Pantalla"),
+            ("2", "Buscá un fondo animado (ej: \"Tahoe Day\")"),
+            ("3", "Tocá el ícono de descarga (☁︎)"),
+            ("4", "Activá \"Mostrar como salvapantallas\""),
+        ]
+        var stepY = cardH - 215
+        for (num, text) in steps {
+            stepY -= 26
+
+            // Bullet con el número
+            let bullet = NSTextField(labelWithString: num)
+            bullet.font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .bold)
+            bullet.textColor = Theme.accent
+            bullet.alignment = .center
+            bullet.frame = NSRect(x: 36, y: stepY, width: 18, height: 18)
+            card.addSubview(bullet)
+
+            let stepLabel = NSTextField(labelWithString: text)
+            stepLabel.font = NSFont.systemFont(ofSize: 12.5)
+            stepLabel.textColor = Theme.textPri
+            stepLabel.frame = NSRect(x: 60, y: stepY, width: cardW - 80, height: 18)
+            card.addSubview(stepLabel)
+        }
+
+        // Botón primario
+        let btn = NSButton(title: "  Abrir Configuración del Sistema", target: self, action: #selector(openWallpaperSettings))
+        btn.bezelStyle = .rounded
+        btn.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        if #available(macOS 11.0, *) {
+            btn.image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
+            btn.imagePosition = .imageLeading
+            btn.bezelColor = Theme.accent
+        }
+        btn.contentTintColor = .white
+        btn.frame = NSRect(x: (cardW - 260) / 2, y: 24, width: 260, height: 32)
+        card.addSubview(btn)
+
+        cv.addSubview(overlay, positioned: .above, relativeTo: nil)
+        aerialSetupOverlay = overlay
+    }
+
+    private func hideAerialSetupOverlay() {
+        aerialSetupOverlay?.removeFromSuperview()
+        aerialSetupOverlay = nil
     }
 
     @objc func openWallpaperSettings() {
