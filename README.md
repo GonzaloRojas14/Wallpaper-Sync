@@ -1,6 +1,7 @@
 # 🎬 Wallpaper Sync
 
-Animated wallpaper engine for macOS Sonoma & Sequoia. Sets the same video as both your **desktop background** and **lock screen** simultaneously.
+> **Live animated video wallpapers for macOS — synced to both desktop and lock screen.**
+> The only open-source Mac app that puts the *same* video on your desktop background **and** your lock screen, with HEVC hardware decoding and a native menu-bar UI.
 
 [![macOS](https://img.shields.io/badge/macOS-Sonoma%20%7C%20Sequoia%20%7C%20Tahoe-blue)](#requirements)
 [![Swift](https://img.shields.io/badge/Swift-5.9-orange)](#)
@@ -10,15 +11,54 @@ Animated wallpaper engine for macOS Sonoma & Sequoia. Sets the same video as bot
 
 > Built by **Gonzalo Rojas** ([@gonza._007](https://instagram.com/gonza._007)). If you find it useful and want to buy me a coffee: **[ceneka.net/gonza_007](https://ceneka.net/gonza_007)** ☕
 
+<!--
+HERO IMAGE / DEMO
+─────────────────
+Drop a 3–5 sec demo GIF (≤8 MB) at docs/demo.gif and uncomment:
+
+<p align="center">
+  <img src="docs/demo.gif" alt="Wallpaper Sync — animated wallpaper synced to desktop and lock screen" width="720">
+</p>
+
+See docs/README.md for the full screenshot spec.
+-->
+
+
+
 ## Features
 
 - 🖥️ **Animated desktop wallpaper** — Video plays behind your icons and windows
 - 🔒 **Lock screen sync** — Same video on your lock/login screen automatically
 - ⚡ **Instant switching** — Change wallpapers in < 1 second (HEVC optimized)
 - 🔋 **Battery smart** — Auto-pause on battery to save power
-- 🎨 **Beautiful GUI** — Dark-themed gallery with video thumbnails
+- 🎨 **Native UI** — Liquid-Glass HUD with live search, hover-lift cards, light/dark adaptive
 - 📦 **Menu bar app** — Runs silently in the background, no dock clutter
 - 🛠️ **Auto-setup** — Installs ffmpeg dependency automatically if needed
+- 🌗 **macOS Tahoe ready** — Uses semantic system colors and `NSVisualEffectView` materials
+
+## Why Wallpaper Sync?
+
+There are several apps for animated wallpapers on macOS, but **none of the popular ones touch the lock screen** — because Apple's sandboxing in the Mac App Store prohibits writing to the system aerial files. Wallpaper Sync runs unsandboxed and rewrites the aerial slot atomically, so the same video plays on your desktop *and* when you wake your Mac to the login screen.
+
+| What you want | [Plash](https://github.com/sindresorhus/Plash) | [Aerial](https://github.com/JohnCoates/Aerial) | Live Wallpaper (App Store) | **Wallpaper Sync** |
+|---|:---:|:---:|:---:|:---:|
+| Animated desktop background | ✅ web pages | ❌ | ✅ | ✅ |
+| Same video on lock screen | ❌ | screensaver only | ❌ | ✅ |
+| HEVC hardware decode | ⚠️ | ✅ | ⚠️ | ✅ |
+| Open source | ✅ | ✅ | ❌ | ✅ |
+| Free, no in-app purchases | ✅ | ✅ | freemium | ✅ |
+| macOS Tahoe-native UI | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| Menu-bar app, no dock icon | ✅ | ❌ | ✅ | ✅ |
+
+If you only need an animated desktop, **Plash** is excellent. If you want the lock screen synced too, this is your option.
+
+## Perfect for
+
+- ☕ **Streamers & content creators** — keep your camera-ready Mac on-brand even when you step away
+- 🌃 **Aesthetic Mac setups** — match dock, accent and wallpaper into a single visual language
+- 🎨 **Mood / ambient computing** — abstract loops, anime AMVs, looping scenery
+- 🔋 **Power-conscious users** — built-in pause-on-battery and a "Power Save" still-frame mode
+- 🌙 **Aerial replacers** — drop in your own video without digging through `Application Support`
 
 ## Installation
 
@@ -52,7 +92,7 @@ bin/wallpaper set your-video.mp4
 ## Usage
 
 ### GUI
-Click the 🎬 icon in the menu bar to open the wallpaper gallery. Click any thumbnail to activate it.
+Click the **▶︎** icon in the menu bar to open the wallpaper gallery. Click any thumbnail to activate it. The HUD has a live search field, a "Power Save" switch, and quick links to my Instagram and donations in the bottom-right corner.
 
 ### CLI
 ```bash
@@ -94,14 +134,16 @@ wallpaper status              # Show current config
 ### Key Design Decisions
 - **Single HEVC format** — Videos are converted once on import. Both desktop and lock screen use the same `.mov` file.
 - **No cache needed** — Since conversion happens at import time, switching is just a file copy (~0.1s).
-- **Hot-reload** — The engine watches `config.json` every 0.5s and swaps videos without restarting.
-- **Sleep/wake safe** — Windows hide on sleep, aerial extension refreshes on unlock.
+- **Hot-reload** — The engine watches `config.json` via FSEvents and swaps videos without restarting.
+- **Sleep/wake safe** — Windows hide on sleep, aerial extension only refreshes when the active video changed.
+- **Cold-boot safe** — A poster frame is regenerated atomically on every wallpaper change, so the login screen on a cold boot shows your *current* wallpaper, not the previous one.
 
 ## Requirements
 
-- macOS Sonoma (14) or Sequoia (15)
+- macOS Sonoma (14), Sequoia (15) or Tahoe (26)
+- Apple Silicon or Intel Mac
 - [ffmpeg](https://formulae.brew.sh/formula/ffmpeg) (installed automatically by the app, or manually via `brew install ffmpeg`)
-- One downloaded Aerial wallpaper in System Settings (e.g., "Tahoe Day")
+- One downloaded Aerial wallpaper in System Settings (e.g., "Tahoe Day"). The app shows a setup dialog with the steps the first time.
 
 ## Performance
 
