@@ -200,6 +200,25 @@ class WallpaperCard: NSView {
     @objc func deleteItem() { onDelete?() }
 }
 
+// MARK: - Icon Button (con hover-tint)
+//
+// Botón sin bordes que cambia el tint al pasarle el mouse encima. Lo usamos
+// para los íconos de Instagram y donaciones en la barra inferior.
+class IconButton: NSButton {
+    var idleTint: NSColor = NSColor.secondaryLabelColor
+    var hoverTint: NSColor = NSColor.controlAccentColor
+    private var trackingArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let t = trackingArea { removeTrackingArea(t) }
+        trackingArea = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self)
+        addTrackingArea(trackingArea!)
+    }
+    override func mouseEntered(with event: NSEvent) { contentTintColor = hoverTint }
+    override func mouseExited(with event: NSEvent) { contentTintColor = idleTint }
+}
+
 // MARK: - Grid Container
 class GridView: NSView {
     var cards: [WallpaperCard] = []
@@ -426,9 +445,49 @@ class MainController: NSObject {
         activeInfoLabel.font = NSFont.monospacedSystemFont(ofSize: 10.5, weight: .regular)
         activeInfoLabel.textColor = Theme.textTer
         activeInfoLabel.alignment = .center
-        activeInfoLabel.frame = NSRect(x: 170, y: 10, width: cv.bounds.width - 200, height: 14)
+        // Reservamos ~80 px en el extremo derecho para los íconos (Instagram + donar)
+        activeInfoLabel.frame = NSRect(x: 170, y: 10, width: cv.bounds.width - 250, height: 14)
         activeInfoLabel.autoresizingMask = [.width]
         bottomBar.addSubview(activeInfoLabel)
+
+        // Iconos sociales / donación — extremo derecho de la bottom bar.
+        // Anclados a la derecha vía .minXMargin para que se queden fijos cuando
+        // la ventana se agranda.
+        let igBtn = IconButton()
+        igBtn.title = ""
+        igBtn.isBordered = false
+        igBtn.imagePosition = .imageOnly
+        if let img = NSImage(systemSymbolName: "at", accessibilityDescription: "Instagram") {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+            igBtn.image = img.withSymbolConfiguration(cfg)
+        }
+        igBtn.contentTintColor = Theme.textSec
+        igBtn.idleTint = Theme.textSec
+        igBtn.hoverTint = NSColor(red: 0.91, green: 0.27, blue: 0.55, alpha: 1) // rosa Instagram
+        igBtn.toolTip = "Instagram · @gonza._007"
+        igBtn.target = self
+        igBtn.action = #selector(openInstagram)
+        igBtn.frame = NSRect(x: cv.bounds.width - 56, y: 8, width: 22, height: 22)
+        igBtn.autoresizingMask = [.minXMargin]
+        bottomBar.addSubview(igBtn)
+
+        let donateBtn = IconButton()
+        donateBtn.title = ""
+        donateBtn.isBordered = false
+        donateBtn.imagePosition = .imageOnly
+        if let img = NSImage(systemSymbolName: "heart.fill", accessibilityDescription: "Donar") {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+            donateBtn.image = img.withSymbolConfiguration(cfg)
+        }
+        donateBtn.contentTintColor = Theme.textSec
+        donateBtn.idleTint = Theme.textSec
+        donateBtn.hoverTint = NSColor.systemPink
+        donateBtn.toolTip = "Invitame un café · ceneka.net/gonza_007"
+        donateBtn.target = self
+        donateBtn.action = #selector(openDonate)
+        donateBtn.frame = NSRect(x: cv.bounds.width - 28, y: 8, width: 22, height: 22)
+        donateBtn.autoresizingMask = [.minXMargin]
+        bottomBar.addSubview(donateBtn)
 
         // Scroll + Grid (entre header y bottom)
         scrollView.frame = NSRect(x: 0, y: bottomH, width: cv.bounds.width, height: cv.bounds.height - headerH - bottomH)
@@ -771,6 +830,14 @@ class MainController: NSObject {
 
     @objc func openWallpaperSettings() {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Wallpaper-Settings.extension")!)
+    }
+
+    @objc func openInstagram() {
+        NSWorkspace.shared.open(URL(string: "https://instagram.com/gonza._007")!)
+    }
+
+    @objc func openDonate() {
+        NSWorkspace.shared.open(URL(string: "https://ceneka.net/gonza_007")!)
     }
 
     private func useWallpaper(_ name: String) {
