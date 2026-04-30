@@ -21,3 +21,4 @@ config.json
 # DMG output
 *.dmg
 dmg_staging/
+.DS_Store
