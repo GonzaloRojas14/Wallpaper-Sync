@@ -11,18 +11,9 @@
 
 > Built by **Gonzalo Rojas** ([@gonza._007](https://instagram.com/gonza._007)). If you find it useful and want to buy me a coffee: **[ceneka.net/gonza_007](https://ceneka.net/gonza_007)** ☕
 
-<!--
-HERO IMAGE / DEMO
-─────────────────
-Drop a 3–5 sec demo GIF (≤8 MB) at docs/demo.gif and uncomment:
-
 <p align="center">
   <img src="docs/demo.gif" alt="Wallpaper Sync — animated wallpaper synced to desktop and lock screen" width="720">
 </p>
-
-See docs/README.md for the full screenshot spec.
--->
-
 
 
 ## Features
@@ -59,6 +50,30 @@ If you only need an animated desktop, **Plash** is excellent. If you want the lo
 - 🎨 **Mood / ambient computing** — abstract loops, anime AMVs, looping scenery
 - 🔋 **Power-conscious users** — built-in pause-on-battery and a "Power Save" still-frame mode
 - 🌙 **Aerial replacers** — drop in your own video without digging through `Application Support`
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshot-hud.jpg" alt="Wallpaper Sync HUD — wallpaper grid with live search and hover-lift cards" width="720"><br>
+  <em>The main HUD with your wallpaper library, live search, power-save toggle, and import button.</em>
+</p>
+
+<p align="center">
+  <video src="https://github.com/GonzaloRojas14/Wallpaper-Sync/raw/main/docs/lockscreen-demo.mp4" width="480" autoplay loop muted playsinline>
+    Your browser does not support the video tag.
+  </video><br>
+  <em>The same video playing on the macOS lock screen — the killer feature.</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshot-setup.jpg" alt="First-run setup modal — configure your lock screen" width="520"><br>
+  <em>First-run setup: the app walks you through downloading an aerial wallpaper.</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshot-menu.jpg" alt="Wallpaper Sync menu bar dropdown" width="280"><br>
+  <em>Menu bar controls — open the HUD, toggle power saving, or quit.</em>
+</p>
 
 ## Installation
 
