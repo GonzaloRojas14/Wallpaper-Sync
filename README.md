@@ -59,9 +59,7 @@ If you only need an animated desktop, **Plash** is excellent. If you want the lo
 </p>
 
 <p align="center">
-  <video src="https://github.com/GonzaloRojas14/Wallpaper-Sync/raw/main/docs/lockscreen-demo.mp4" width="480" autoplay loop muted playsinline>
-    Your browser does not support the video tag.
-  </video><br>
+  <img src="docs/lockscreen-demo.gif" alt="macOS lock screen running an animated wallpaper via Wallpaper Sync" width="480"><br>
   <em>The same video playing on the macOS lock screen — the killer feature.</em>
 </p>
 
