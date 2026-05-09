@@ -76,9 +76,13 @@ If you only need an animated desktop, **Plash** is excellent. If you want the lo
 ## Installation
 
 ### Download
-1. Download the latest `WallpaperSync-X.Y.dmg` from [Releases](https://github.com/GonzaloRojas14/Wallpaper-Sync/releases)
-2. Open the DMG and drag **Wallpaper Sync** to Applications
-3. Right-click → **Open** (first time only — the app is not notarized because I don't have an Apple Developer ID, so macOS shows the "unidentified developer" warning)
+1. Download the latest `WallpaperSync-X.Y.zip` from [Releases](https://github.com/GonzaloRojas14/Wallpaper-Sync/releases).
+2. Double-click the ZIP to extract **Wallpaper Sync.app**, then drag it into **Applications**.
+3. First launch only: **right-click** the app → **Open** → **Open**. macOS shows an "unidentified developer" warning because the app isn't notarized (I don't have a paid Apple Developer ID). After this first time it opens normally.
+
+> On macOS Sequoia (15+) the right-click trick may be gone. In that case launch the app once (it'll be blocked), then go to **System Settings → Privacy & Security**, scroll down and click **"Open Anyway"** next to "Wallpaper Sync was blocked".
+
+> The app is distributed as a `.zip` instead of a `.dmg` on purpose: on Apple Silicon, unsigned DMGs get flagged as **"damaged"** by Gatekeeper and won't even mount. ZIPs avoid that.
 
 ### First-time Setup
 1. The app will offer to install `ffmpeg` if not already present
