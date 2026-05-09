@@ -317,7 +317,14 @@ final class WallpaperEngine: NSObject {
 
     @objc private func displayWake() {
         log("display wake")
-        // The screen might still be locked here, but if not, ensure we resume
+        // Restaurar la ventana SIEMPRE: displaySleep la ocultó con orderOut.
+        // Si screenUnlocked llega después también va a hacer orderFront,
+        // pero no podemos depender de él porque solo dispara si la Mac pidió
+        // contraseña al despertar. Sin lock, sólo llega displayWake — y antes
+        // de este fix la ventana quedaba escondida y se veía el desktop negro.
+        // El window level está debajo del lock screen, así que orderFront es
+        // seguro incluso si la pantalla todavía está bloqueada.
+        windows.forEach { $0.orderFront(nil) }
         if !isPaused { players.forEach { $0.play() } }
     }
 
