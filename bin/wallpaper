@@ -108,7 +108,13 @@ sync_lockscreen() {
 
 # ── Engine control ────────────────────────────────────────────────────
 is_running() {
-  [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2>/dev/null
+  [ -f "$PID" ] || return 1
+  local p; p="$(cat "$PID" 2>/dev/null)"
+  [ -n "$p" ] || return 1
+  kill -0 "$p" 2>/dev/null || { rm -f "$PID"; return 1; }
+  # Verificar que el PID corresponde a WallpaperEngine y no a un proceso
+  # que reciclo ese PID despues de que el motor murio.
+  ps -p "$p" -o comm= 2>/dev/null | grep -q "WallpaperEngine$" || { rm -f "$PID"; return 1; }
 }
 
 cmd_start() {
