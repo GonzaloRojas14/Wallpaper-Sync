@@ -35,6 +35,8 @@ final class WallpaperEngine: NSObject {
     private var logRotateTimer: Timer?
     private var isShuttingDown = false
     private var aerialNeedsRefresh = false
+    private var sleepStartedAt: Date?
+    private static let longSleepThreshold: TimeInterval = 120  // 2 minutos
 
     init(videoPath: String, fillMode: AVLayerVideoGravity, pauseOnBattery: Bool,
          pauseOnLowPower: Bool, powerSavingMode: Bool, sanityMode: Bool, windowLevel: Int, configPath: String) {
@@ -311,19 +313,31 @@ final class WallpaperEngine: NSObject {
 
     @objc private func displaySleep() {
         log("display sleep — pausing and hiding")
+        sleepStartedAt = Date()
         players.forEach { $0.pause() }
         windows.forEach { $0.orderOut(nil) }
     }
 
     @objc private func displayWake() {
-        log("display wake")
-        // Restaurar la ventana SIEMPRE: displaySleep la ocultó con orderOut.
-        // Si screenUnlocked llega después también va a hacer orderFront,
-        // pero no podemos depender de él porque solo dispara si la Mac pidió
-        // contraseña al despertar. Sin lock, sólo llega displayWake — y antes
-        // de este fix la ventana quedaba escondida y se veía el desktop negro.
-        // El window level está debajo del lock screen, así que orderFront es
-        // seguro incluso si la pantalla todavía está bloqueada.
+        let elapsed = sleepStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+        sleepStartedAt = nil
+        log("display wake (slept \(Int(elapsed))s)")
+
+        // En suspensos largos macOS apaga el GPU y la superficie del
+        // AVPlayerLayer queda invalidada. Si solo hacemos orderFront+play,
+        // la ventana se ve pero el layer no tiene frames y el usuario ve
+        // negro. La única forma confiable de recuperarse es reconstruir
+        // el pipeline (windows + players + loopers + layers) desde cero.
+        if elapsed > Self.longSleepThreshold {
+            log("long sleep — rebuilding wallpaper pipeline")
+            rebuildWindows()
+            applyPowerPolicy()
+            return
+        }
+
+        // Suspensos cortos: la superficie sigue viva, basta con mostrar
+        // y reanudar. El window level (debajo del lock screen) hace que
+        // orderFront sea seguro incluso si todavía está bloqueada.
         windows.forEach { $0.orderFront(nil) }
         if !isPaused { players.forEach { $0.play() } }
     }
