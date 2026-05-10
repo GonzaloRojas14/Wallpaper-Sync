@@ -323,15 +323,19 @@ final class WallpaperEngine: NSObject {
         sleepStartedAt = nil
         log("display wake (slept \(Int(elapsed))s)")
 
-        // En suspensos largos macOS apaga el GPU y la superficie del
-        // AVPlayerLayer queda invalidada. Si solo hacemos orderFront+play,
-        // la ventana se ve pero el layer no tiene frames y el usuario ve
-        // negro. La única forma confiable de recuperarse es reconstruir
-        // el pipeline (windows + players + loopers + layers) desde cero.
+        // En suspensos largos macOS tira abajo el GPU y la sesión de
+        // AVFoundation. Reciclar AVPlayer/AVPlayerLayer dentro del mismo
+        // proceso no recupera la superficie — el user ve negro aunque
+        // el rebuild "ande". La única forma confiable es execv: que el
+        // proceso se reemplace por una instancia fresca de sí mismo,
+        // mismo PID (engine.pid sigue válido), todo el estado de
+        // AppKit/AVFoundation/GPU se inicializa de cero.
         if elapsed > Self.longSleepThreshold {
-            log("long sleep — rebuilding wallpaper pipeline")
-            rebuildWindows()
-            applyPowerPolicy()
+            log("long sleep — execv self to reset AVFoundation/GPU state")
+            // Diferir un instante para que el log se flushee antes del exec.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.execSelf()
+            }
             return
         }
 
@@ -340,6 +344,22 @@ final class WallpaperEngine: NSObject {
         // orderFront sea seguro incluso si todavía está bloqueada.
         windows.forEach { $0.orderFront(nil) }
         if !isPaused { players.forEach { $0.play() } }
+    }
+
+    private func execSelf() {
+        let argv = CommandLine.arguments
+        guard let exe = argv.first else {
+            log("execSelf: no executable path — fallback rebuild")
+            rebuildWindows(); applyPowerPolicy(); return
+        }
+        // Construir argv como C-string array, terminado en NULL.
+        let cArgs: [UnsafeMutablePointer<CChar>?] = argv.map { strdup($0) } + [nil]
+        cArgs.withUnsafeBufferPointer { buf in
+            _ = execv(exe, UnsafeMutablePointer(mutating: buf.baseAddress))
+        }
+        // Si llegamos acá, execv falló.
+        log("execv failed (errno=\(errno)) — fallback to in-process rebuild")
+        rebuildWindows(); applyPowerPolicy()
     }
 
     @objc private func powerStateChanged() { applyPowerPolicy() }
