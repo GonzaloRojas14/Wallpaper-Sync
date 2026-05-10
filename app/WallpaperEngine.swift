@@ -246,7 +246,11 @@ final class WallpaperEngine: NSObject {
             let player = AVQueuePlayer()
             player.isMuted = true
             player.actionAtItemEnd = .none
-            player.automaticallyWaitsToMinimizeStalling = false
+            // true (default) deja que AVPlayer espere el buffer antes de tirar.
+            // Antes estaba en false, lo que causaba que después de execv (post
+            // long-sleep wake) el play() corriera con el asset sin cargar y el
+            // player quedara en stalled mostrando solo el primer frame.
+            player.automaticallyWaitsToMinimizeStalling = true
             if #available(macOS 10.12, *) {
                 player.preventsDisplaySleepDuringVideoPlayback = false
             }
