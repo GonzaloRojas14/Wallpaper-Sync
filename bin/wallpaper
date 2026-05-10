@@ -128,6 +128,11 @@ cmd_start() {
   sleep 0.3
   is_running || die "no arrancó (ver $LOG)"
   info "encendido (pid $(cat "$PID"))"
+
+  # Resincronizar el slot del lock screen al video actual. Sin esto, después
+  # de un reboot el sistema sigue mostrando el último video que se haya
+  # sincronizado manualmente (con `wallpaper use` o `set`), no el activo.
+  sync_lockscreen "$vid"
 }
 
 cmd_stop() {
