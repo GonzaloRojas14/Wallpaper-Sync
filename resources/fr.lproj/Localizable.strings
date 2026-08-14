@@ -1,0 +1,73 @@
+/* Wallpaper Sync — Français
+ *
+ * Toute clé absente ici retombe automatiquement sur l'anglais
+ * (resources/en.lproj/Localizable.strings). Voir docs/TRANSLATING.md.
+ *
+ * Traduction initiale non relue par un locuteur natif — corrections bienvenues.
+ */
+
+/* MARK: - Header */
+"header.title"                = "Bibliothèque";
+"header.search"               = "Rechercher des fonds d'écran";
+"header.powersave"            = "Économie";
+"header.import"               = "Importer";
+"header.language"             = "Langue";
+
+/* MARK: - Wallpaper card */
+"card.active"                 = "Actif";
+"card.delete"                 = "Supprimer « %@ »";
+
+/* MARK: - Status bar (bottom of the window) */
+"status.engine.running"       = "Moteur actif";
+"status.engine.stopped"       = "Moteur arrêté";
+/* Active video summary: name, width, height, size in MB, duration in seconds */
+"status.video"                = "▶ %@  ·  %d×%d  ·  HEVC  ·  %d Mo  ·  %d s";
+"status.donate"               = "Offrez-moi un café · %@";
+"status.donate.label"         = "Faire un don";
+
+/* MARK: - Empty library banner */
+"banner.empty.title"          = "Votre bibliothèque est vide";
+"banner.empty.body"           = "Importez une vidéo (.mp4, .mov, .gif) pour l'utiliser comme fond d'écran animé.";
+"banner.empty.button"         = "Importer une vidéo";
+
+/* MARK: - Lock screen setup overlay */
+"setup.title"                 = "Configurez votre écran verrouillé";
+"setup.subtitle"              = "Pour synchroniser la vidéo avec votre écran verrouillé, macOS a besoin d'un fond d'écran aérien téléchargé.";
+"setup.step.1"                = "Ouvrez Réglages Système → Fond d'écran";
+"setup.step.2"                = "Trouvez un fond d'écran animé (ex. « Tahoe Day »)";
+"setup.step.3"                = "Cliquez sur l'icône de téléchargement (☁︎)";
+"setup.step.4"                = "Activez « Afficher comme économiseur d'écran »";
+"setup.button"                = "Ouvrir Réglages Système";
+
+/* MARK: - Import panel */
+"panel.import.title"          = "Sélectionnez les vidéos à importer";
+"panel.import.prompt"         = "Importer";
+
+/* MARK: - Delete confirmation */
+"alert.delete.title"          = "Supprimer « %@ » ?";
+"alert.delete.body"           = "Elle sera retirée de votre bibliothèque.";
+"alert.delete.confirm"        = "Supprimer";
+
+/* MARK: - ffmpeg / Homebrew setup */
+"alert.ffmpeg.title"          = "ffmpeg est requis";
+"alert.ffmpeg.body"           = "Wallpaper Sync a besoin de ffmpeg pour convertir les vidéos.\n\nVoulez-vous l'installer automatiquement ?";
+"alert.ffmpeg.install"        = "Installer ffmpeg";
+"alert.ffmpeg.later"          = "Plus tard";
+"alert.ffmpeg.installing"     = "Installation de ffmpeg…";
+"alert.ffmpeg.installing.body" = "Cela peut prendre quelques minutes.\nNe fermez pas cette fenêtre.";
+"alert.ffmpeg.installing.wait" = "Veuillez patienter…";
+"alert.ffmpeg.done.title"     = "✓ ffmpeg installé";
+"alert.ffmpeg.done.body"      = "C'est prêt ! Vous pouvez maintenant importer et utiliser vos vidéos.";
+"alert.ffmpeg.failed.title"   = "Impossible d'installer ffmpeg";
+"alert.ffmpeg.failed.body"    = "Ouvrez Terminal et exécutez :\nbrew install ffmpeg";
+"alert.brew.title"            = "Homebrew est requis";
+"alert.brew.body"             = "Homebrew est le gestionnaire de paquets de macOS.\nTerminal va s'ouvrir pour l'installer.\n\nUne fois Homebrew installé, exécutez :\nbrew install ffmpeg";
+"alert.brew.open"             = "Ouvrir Terminal";
+
+/* MARK: - Menu bar */
+"menu.open"                   = "Ouvrir le HUD";
+"menu.powersave"              = "Économie d'énergie (image fixe)";
+"menu.quit"                   = "Quitter";
+
+/* MARK: - Shared */
+"common.cancel"               = "Annuler";

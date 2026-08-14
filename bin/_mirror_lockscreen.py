@@ -25,7 +25,7 @@ def mirror(node, touched):
 def main():
     dry = "--dry-run" in sys.argv
     if not os.path.exists(INDEX):
-        print("no existe el Index.plist del WallpaperAgent", file=sys.stderr); sys.exit(1)
+        print("WallpaperAgent Index.plist does not exist", file=sys.stderr); sys.exit(1)
 
     with open(INDEX, "rb") as f:
         d = plistlib.load(f)
@@ -49,7 +49,7 @@ def main():
         asd["Idle"]["LastUse"] = now
         touched += 1
 
-    print(f"nodos a espejar: {touched}")
+    print(f"nodes mirrored: {touched}")
     if dry or touched == 0:
         return
 

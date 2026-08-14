@@ -1,0 +1,72 @@
+/* Wallpaper Sync — English (development language)
+ *
+ * Keys are semantic and grouped by the screen they appear on. Every other
+ * language falls back to this file key-by-key, so this catalog must stay
+ * complete. See docs/TRANSLATING.md before adding a language.
+ */
+
+/* MARK: - Header */
+"header.title"                = "Library";
+"header.search"               = "Search wallpapers";
+"header.powersave"            = "Power Save";
+"header.import"               = "Import";
+"header.language"             = "Language";
+
+/* MARK: - Wallpaper card */
+"card.active"                 = "Active";
+"card.delete"                 = "Delete \"%@\"";
+
+/* MARK: - Status bar (bottom of the window) */
+"status.engine.running"       = "Engine running";
+"status.engine.stopped"       = "Engine stopped";
+/* Active video summary: name, width, height, size in MB, duration in seconds */
+"status.video"                = "▶ %@  ·  %d×%d  ·  HEVC  ·  %dMB  ·  %ds";
+"status.donate"               = "Buy me a coffee · %@";
+"status.donate.label"         = "Donate";
+
+/* MARK: - Empty library banner */
+"banner.empty.title"          = "Your library is empty";
+"banner.empty.body"           = "Import a video (.mp4, .mov, .gif) to use it as an animated wallpaper.";
+"banner.empty.button"         = "Import Video";
+
+/* MARK: - Lock screen setup overlay */
+"setup.title"                 = "Set up your lock screen";
+"setup.subtitle"              = "To sync the video with your lock screen, macOS needs a downloaded aerial wallpaper.";
+"setup.step.1"                = "Open System Settings → Wallpaper";
+"setup.step.2"                = "Find an animated wallpaper (e.g. \"Tahoe Day\")";
+"setup.step.3"                = "Click the download icon (☁︎)";
+"setup.step.4"                = "Turn on \"Show as screen saver\"";
+"setup.button"                = "Open System Settings";
+
+/* MARK: - Import panel */
+"panel.import.title"          = "Select videos to import";
+"panel.import.prompt"         = "Import";
+
+/* MARK: - Delete confirmation */
+"alert.delete.title"          = "Delete \"%@\"?";
+"alert.delete.body"           = "It will be removed from your library.";
+"alert.delete.confirm"        = "Delete";
+
+/* MARK: - ffmpeg / Homebrew setup */
+"alert.ffmpeg.title"          = "ffmpeg is required";
+"alert.ffmpeg.body"           = "Wallpaper Sync needs ffmpeg to convert videos.\n\nWould you like to install it automatically?";
+"alert.ffmpeg.install"        = "Install ffmpeg";
+"alert.ffmpeg.later"          = "Later";
+"alert.ffmpeg.installing"     = "Installing ffmpeg…";
+"alert.ffmpeg.installing.body" = "This may take a couple of minutes.\nDon't close this window.";
+"alert.ffmpeg.installing.wait" = "Waiting…";
+"alert.ffmpeg.done.title"     = "✓ ffmpeg installed";
+"alert.ffmpeg.done.body"      = "All set! You can now import and use your videos.";
+"alert.ffmpeg.failed.title"   = "Couldn't install ffmpeg";
+"alert.ffmpeg.failed.body"    = "Open Terminal and run:\nbrew install ffmpeg";
+"alert.brew.title"            = "Homebrew is required";
+"alert.brew.body"             = "Homebrew is the macOS package manager.\nTerminal will open so you can install it.\n\nAfter installing Homebrew, run:\nbrew install ffmpeg";
+"alert.brew.open"             = "Open Terminal";
+
+/* MARK: - Menu bar */
+"menu.open"                   = "Open HUD";
+"menu.powersave"              = "Power Save (still frame)";
+"menu.quit"                   = "Quit";
+
+/* MARK: - Shared */
+"common.cancel"               = "Cancel";

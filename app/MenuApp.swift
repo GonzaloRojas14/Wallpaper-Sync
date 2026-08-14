@@ -63,7 +63,7 @@ class WallpaperCard: NSView {
     private let nameLabel = NSTextField(labelWithString: "")
     private let activePill = NSView()
     private let activeIcon = NSImageView()
-    private let activeText = NSTextField(labelWithString: "Activo")
+    private let activeText = NSTextField(labelWithString: I18n.t("card.active"))
     private var trackingArea: NSTrackingArea?
 
     init(path: String, name: String) {
@@ -110,7 +110,7 @@ class WallpaperCard: NSView {
         activePill.isHidden = true
         addSubview(activePill)
 
-        if let img = NSImage(systemSymbolName: "play.fill", accessibilityDescription: "Activo") {
+        if let img = NSImage(systemSymbolName: "play.fill", accessibilityDescription: I18n.t("card.active")) {
             let cfg = NSImage.SymbolConfiguration(pointSize: 9, weight: .bold)
             activeIcon.image = img.withSymbolConfiguration(cfg)
             activeIcon.contentTintColor = .white
@@ -192,7 +192,7 @@ class WallpaperCard: NSView {
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let m = NSMenu()
-        let del = NSMenuItem(title: "Eliminar \"\(videoName)\"", action: #selector(deleteItem), keyEquivalent: "")
+        let del = NSMenuItem(title: I18n.t("card.delete", videoName), action: #selector(deleteItem), keyEquivalent: "")
         del.target = self
         m.addItem(del)
         return m
@@ -274,8 +274,7 @@ class MainController: NSObject {
     private var aerialSetupOverlay: NSView?
 
     lazy var appSupportURL: URL = {
-        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("WallpaperSync")
+        let url = AppPaths.appSupport
         try? FileManager.default.createDirectory(at: url.appendingPathComponent("library"), withIntermediateDirectories: true)
         return url
     }()
@@ -291,6 +290,17 @@ class MainController: NSObject {
     private let searchField = NSSearchField()
     private var allCards: [WallpaperCard] = []
 
+    // Controles con texto traducible. Viven como propiedades (y no como
+    // locales del init) para que applyLocalizedStrings() pueda reescribirlos
+    // cuando el usuario cambia de idioma, sin reabrir la ventana.
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let psLabel = NSTextField(labelWithString: "")
+    private let psBolt = NSImageView()
+    private let importBtn = NSButton()
+    private let donateBtn = IconButton()
+    private let languageBtn = NSPopUpButton()
+    private weak var headerView: NSView?
+
     override init() {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 880, height: 620),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -298,10 +308,10 @@ class MainController: NSObject {
         super.init()
 
         window.title = "Wallpaper Sync"
-        // Min width 760 deja espacio para traffic lights + título + search +
+        // Min width 800 deja espacio para traffic lights + título + search +
         // controles de la derecha sin solapamiento. Por debajo de eso ocultamos
         // el search field dinámicamente.
-        window.minSize = NSSize(width: 760, height: 500)
+        window.minSize = NSSize(width: 800, height: 500)
         window.center()
         window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = true
@@ -329,6 +339,7 @@ class MainController: NSObject {
         header.blendingMode = .withinWindow
         header.state = .active
         cv.addSubview(header)
+        headerView = header
 
         // Separador hairline debajo del header
         let headerSep = NSBox(frame: NSRect(x: 0, y: 0, width: cv.bounds.width, height: 1))
@@ -351,40 +362,32 @@ class MainController: NSObject {
         titleIcon.frame = NSRect(x: titleX, y: 18, width: 22, height: 22)
         header.addSubview(titleIcon)
 
-        let titleLabel = NSTextField(labelWithString: "Biblioteca")
         titleLabel.font = NSFont.systemFont(ofSize: 16, weight: .semibold)
         titleLabel.textColor = Theme.textPri
         titleLabel.frame = NSRect(x: titleX + 30, y: 18, width: 140, height: 22)
         header.addSubview(titleLabel)
 
-        // Search field — flex center. Crece con la ventana via .width mask.
-        // En ventanas chicas se oculta en updateHeaderLayout().
-        searchField.placeholderString = "Buscar wallpapers"
+        // Search field — flex center. El ancho lo fija layoutHeaderControls(),
+        // que reserva a la derecha lo que realmente miden los controles.
         searchField.font = NSFont.systemFont(ofSize: 12, weight: .regular)
         searchField.target = self
         searchField.action = #selector(searchChanged)
         searchField.sendsSearchStringImmediately = true
         searchField.sendsWholeSearchString = false
-        let searchLeft: CGFloat = titleX + 30 + 150  // = 264
-        searchField.frame = NSRect(x: searchLeft, y: 16, width: max(180, cv.bounds.width - searchLeft - 310), height: 24)
         searchField.autoresizingMask = [.width]
         header.addSubview(searchField)
 
         // Power save — switch nativo con icono bolt
-        let psBolt = NSImageView()
         if let img = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil) {
             let cfg = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
             psBolt.image = img.withSymbolConfiguration(cfg)
             psBolt.contentTintColor = Theme.textSec
         }
-        psBolt.frame = NSRect(x: cv.bounds.width - 290, y: 20, width: 14, height: 16)
         psBolt.autoresizingMask = [.minXMargin]
         header.addSubview(psBolt)
 
-        let psLabel = NSTextField(labelWithString: "Ahorro")
         psLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         psLabel.textColor = Theme.textSec
-        psLabel.frame = NSRect(x: cv.bounds.width - 272, y: 20, width: 60, height: 16)
         psLabel.autoresizingMask = [.minXMargin]
         header.addSubview(psLabel)
 
@@ -395,12 +398,20 @@ class MainController: NSObject {
         powerSaveBtn.title = ""
         powerSaveBtn.target = self
         powerSaveBtn.action = #selector(togglePowerSaveHUD)
-        powerSaveBtn.frame = NSRect(x: cv.bounds.width - 210, y: 20, width: 30, height: 16)
         powerSaveBtn.autoresizingMask = [.minXMargin]
         header.addSubview(powerSaveBtn)
 
+        // Selector de idioma — pull-down con ícono de globo. El menú se arma en
+        // rebuildLanguageMenu() a partir de los .lproj que haya en el bundle.
+        languageBtn.pullsDown = true
+        languageBtn.bezelStyle = .texturedRounded
+        languageBtn.imagePosition = .imageOnly
+        languageBtn.autoresizingMask = [.minXMargin]
+        header.addSubview(languageBtn)
+
         // Botón Importar — borderedProminent style HIG-compliant
-        let importBtn = NSButton(title: "  Importar", target: self, action: #selector(importVideo))
+        importBtn.target = self
+        importBtn.action = #selector(importVideo)
         importBtn.bezelStyle = .rounded
         if #available(macOS 11.0, *) {
             importBtn.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)
@@ -413,7 +424,6 @@ class MainController: NSObject {
             importBtn.bezelColor = Theme.accent
         }
         importBtn.contentTintColor = .white
-        importBtn.frame = NSRect(x: cv.bounds.width - 130, y: 16, width: 110, height: 26)
         importBtn.autoresizingMask = [.minXMargin]
         header.addSubview(importBtn)
 
@@ -471,18 +481,16 @@ class MainController: NSObject {
         igBtn.autoresizingMask = [.minXMargin]
         bottomBar.addSubview(igBtn)
 
-        let donateBtn = IconButton()
         donateBtn.title = ""
         donateBtn.isBordered = false
         donateBtn.imagePosition = .imageOnly
-        if let img = NSImage(systemSymbolName: "heart.fill", accessibilityDescription: "Donar") {
+        if let img = NSImage(systemSymbolName: "heart.fill", accessibilityDescription: I18n.t("status.donate.label")) {
             let cfg = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
             donateBtn.image = img.withSymbolConfiguration(cfg)
         }
         donateBtn.contentTintColor = Theme.textSec
         donateBtn.idleTint = Theme.textSec
         donateBtn.hoverTint = NSColor.systemPink
-        donateBtn.toolTip = "Invitame un café · ceneka.net/gonza_007"
         donateBtn.target = self
         donateBtn.action = #selector(openDonate)
         donateBtn.frame = NSRect(x: cv.bounds.width - 28, y: 8, width: 22, height: 22)
@@ -509,10 +517,91 @@ class MainController: NSObject {
             object: scrollView.contentView
         )
 
+        applyLocalizedStrings()
         reloadLibrary()
         // Ancho inicial correcto incluso si la ventana arrancó más grande
         // que el frame de design.
         DispatchQueue.main.async { [weak self] in self?.syncGridWidth() }
+    }
+
+    // MARK: - Idioma
+
+    /// Reescribe todo el texto fijo de la ventana. Se llama al abrir y cada vez
+    /// que cambia el idioma. Las cards, el banner y el overlay se rearman solos
+    /// en reloadLibrary(), así que acá sólo van los controles persistentes.
+    private func applyLocalizedStrings() {
+        titleLabel.stringValue = I18n.t("header.title")
+        searchField.placeholderString = I18n.t("header.search")
+        psLabel.stringValue = I18n.t("header.powersave")
+        importBtn.title = "  " + I18n.t("header.import")
+        donateBtn.toolTip = I18n.t("status.donate", "ceneka.net/gonza_007")
+        languageBtn.toolTip = I18n.t("header.language")
+        rebuildLanguageMenu()
+        layoutHeaderControls()
+    }
+
+    /// Ubica el grupo derecho del header midiendo el texto ya traducido, de
+    /// derecha a izquierda. Con offsets fijos no alcanza: "Ahorro" mide 40pt y
+    /// "Power Save" 67, así que la posición depende del idioma.
+    private func layoutHeaderControls() {
+        guard let header = headerView else { return }
+        let w = header.bounds.width
+        let margin: CGFloat = 20   // contra el borde derecho
+        let gap: CGFloat = 14      // entre controles
+
+        importBtn.sizeToFit()
+        let importW = max(110, ceil(importBtn.frame.width) + 8)
+        importBtn.frame = NSRect(x: w - margin - importW, y: 16, width: importW, height: 26)
+
+        let langW: CGFloat = 38
+        languageBtn.frame = NSRect(x: importBtn.frame.minX - gap - langW, y: 15, width: langW, height: 26)
+
+        let switchW: CGFloat = 30
+        powerSaveBtn.frame = NSRect(x: languageBtn.frame.minX - gap - switchW, y: 20, width: switchW, height: 16)
+
+        psLabel.sizeToFit()
+        let labelW = ceil(psLabel.frame.width)
+        psLabel.frame = NSRect(x: powerSaveBtn.frame.minX - 6 - labelW, y: 20, width: labelW, height: 16)
+        psBolt.frame = NSRect(x: psLabel.frame.minX - 18, y: 20, width: 14, height: 16)
+
+        // El search se queda con lo que sobra. El piso evita que colapse en
+        // idiomas con etiquetas largas cuando la ventana está en su mínimo.
+        let searchLeft: CGFloat = 264
+        searchField.frame = NSRect(x: searchLeft, y: 16,
+                                   width: max(140, psBolt.frame.minX - 20 - searchLeft), height: 24)
+    }
+
+    private func rebuildLanguageMenu() {
+        let menu = NSMenu()
+
+        // En un pull-down el item 0 es el título del botón, no una opción:
+        // le ponemos el globo y nada de texto.
+        let head = NSMenuItem()
+        head.title = ""
+        if let img = NSImage(systemSymbolName: "globe", accessibilityDescription: I18n.t("header.language")) {
+            let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+            head.image = img.withSymbolConfiguration(cfg)
+        }
+        menu.addItem(head)
+
+        for lang in I18n.available {
+            let item = NSMenuItem(title: lang.name, action: #selector(languageSelected(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = lang.code
+            item.state = (lang.code == I18n.currentCode) ? .on : .off
+            menu.addItem(item)
+        }
+        languageBtn.menu = menu
+    }
+
+    @objc private func languageSelected(_ sender: NSMenuItem) {
+        guard let code = sender.representedObject as? String, code != I18n.currentCode else { return }
+        I18n.select(code)
+        applyLocalizedStrings()
+        // El overlay de setup se arma con strings ya traducidos: hay que
+        // tirarlo para que reloadLibrary() lo vuelva a construir en el idioma nuevo.
+        hideAerialSetupOverlay()
+        reloadLibrary()
     }
 
     @objc private func syncGridWidth() {
@@ -567,7 +656,7 @@ class MainController: NSObject {
             statusIcon.image = img.withSymbolConfiguration(cfg)
             statusIcon.contentTintColor = engineRunning ? NSColor.systemGreen : NSColor.systemRed
         }
-        statusLabel.stringValue = engineRunning ? "Motor activo" : "Motor detenido"
+        statusLabel.stringValue = I18n.t(engineRunning ? "status.engine.running" : "status.engine.stopped")
 
         // Active video info in bottom bar
         if !activeName.isEmpty {
@@ -580,7 +669,9 @@ class MainController: NSObject {
                     let dur = CMTimeGetSeconds(asset.duration)
                     let fs = (try? FileManager.default.attributesOfItem(atPath: vp)[.size] as? Int) ?? 0
                     DispatchQueue.main.async {
-                        self?.activeInfoLabel.stringValue = "▶ \(self?.activeName ?? "")  ·  \(Int(sz.width))×\(Int(sz.height))  ·  HEVC  ·  \(fs/(1024*1024))MB  ·  \(Int(dur))s"
+                        self?.activeInfoLabel.stringValue = I18n.t(
+                            "status.video", self?.activeName ?? "",
+                            Int(sz.width), Int(sz.height), fs / (1024 * 1024), Int(dur))
                     }
                 }
             }
@@ -627,9 +718,9 @@ class MainController: NSObject {
             let emptyBanner = makeBanner(
                 symbol: "tray.fill",
                 tint: Theme.accent,
-                title: "Tu biblioteca está vacía",
-                body: "Importá un video (.mp4, .mov, .gif) para usarlo como wallpaper animado.",
-                buttonTitle: "Importar Video",
+                title: I18n.t("banner.empty.title"),
+                body: I18n.t("banner.empty.body"),
+                buttonTitle: I18n.t("banner.empty.button"),
                 buttonSymbol: "plus",
                 action: #selector(importVideo)
             )
@@ -760,7 +851,7 @@ class MainController: NSObject {
         card.addSubview(symView)
 
         // Título
-        let title = NSTextField(labelWithString: "Configurá la pantalla de bloqueo")
+        let title = NSTextField(labelWithString: I18n.t("setup.title"))
         title.font = NSFont.systemFont(ofSize: 18, weight: .semibold)
         title.textColor = Theme.textPri
         title.alignment = .center
@@ -768,7 +859,7 @@ class MainController: NSObject {
         card.addSubview(title)
 
         // Subtítulo
-        let subtitle = NSTextField(labelWithString: "Para sincronizar el video con tu lock screen, macOS necesita un fondo aerial descargado.")
+        let subtitle = NSTextField(labelWithString: I18n.t("setup.subtitle"))
         subtitle.font = NSFont.systemFont(ofSize: 13)
         subtitle.textColor = Theme.textSec
         subtitle.alignment = .center
@@ -779,12 +870,7 @@ class MainController: NSObject {
         card.addSubview(subtitle)
 
         // Pasos numerados
-        let steps: [(String, String)] = [
-            ("1", "Abrí Configuración del Sistema → Fondo de Pantalla"),
-            ("2", "Buscá un fondo animado (ej: \"Tahoe Day\")"),
-            ("3", "Tocá el ícono de descarga (☁︎)"),
-            ("4", "Activá \"Mostrar como salvapantallas\""),
-        ]
+        let steps = (1...4).map { (String($0), I18n.t("setup.step.\($0)")) }
         var stepY = cardH - 215
         for (num, text) in steps {
             stepY -= 26
@@ -805,7 +891,7 @@ class MainController: NSObject {
         }
 
         // Botón primario
-        let btn = NSButton(title: "  Abrir Configuración del Sistema", target: self, action: #selector(openWallpaperSettings))
+        let btn = NSButton(title: "  " + I18n.t("setup.button"), target: self, action: #selector(openWallpaperSettings))
         btn.bezelStyle = .rounded
         btn.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
         if #available(macOS 11.0, *) {
@@ -859,10 +945,10 @@ class MainController: NSObject {
 
     private func deleteWallpaper(_ name: String) {
         let alert = NSAlert()
-        alert.messageText = "¿Eliminar \"\(name)\"?"
-        alert.informativeText = "Se va a eliminar de la biblioteca."
-        alert.addButton(withTitle: "Eliminar")
-        alert.addButton(withTitle: "Cancelar")
+        alert.messageText = I18n.t("alert.delete.title", name)
+        alert.informativeText = I18n.t("alert.delete.body")
+        alert.addButton(withTitle: I18n.t("alert.delete.confirm"))
+        alert.addButton(withTitle: I18n.t("common.cancel"))
         alert.alertStyle = .warning
         if alert.runModal() == .alertFirstButtonReturn {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -879,8 +965,8 @@ class MainController: NSObject {
             .init(filenameExtension: "m4v")!, .init(filenameExtension: "gif")!,
         ]
         panel.allowsMultipleSelection = true
-        panel.title = "Seleccioná videos para importar"
-        panel.prompt = "Importar"
+        panel.title = I18n.t("panel.import.title")
+        panel.prompt = I18n.t("panel.import.prompt")
         if panel.runModal() == .OK {
             for url in panel.urls {
                 DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -960,11 +1046,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // ffmpeg not found — ask to install
         let alert = NSAlert()
-        alert.messageText = "Se necesita ffmpeg"
-        alert.informativeText = "Wallpaper Sync necesita ffmpeg para convertir videos.\n\n¿Querés que lo instale automáticamente?"
+        alert.messageText = I18n.t("alert.ffmpeg.title")
+        alert.informativeText = I18n.t("alert.ffmpeg.body")
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Instalar ffmpeg")
-        alert.addButton(withTitle: "Más tarde")
+        alert.addButton(withTitle: I18n.t("alert.ffmpeg.install"))
+        alert.addButton(withTitle: I18n.t("alert.ffmpeg.later"))
 
         if alert.runModal() != .alertFirstButtonReturn { onReady(); return }
 
@@ -977,9 +1063,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func installFFmpeg(brew: String, then onReady: @escaping () -> Void) {
         let progress = NSAlert()
-        progress.messageText = "Instalando ffmpeg…"
-        progress.informativeText = "Esto puede tardar un par de minutos.\nNo cierres esta ventana."
-        progress.addButton(withTitle: "Esperando…")
+        progress.messageText = I18n.t("alert.ffmpeg.installing")
+        progress.informativeText = I18n.t("alert.ffmpeg.installing.body")
+        progress.addButton(withTitle: I18n.t("alert.ffmpeg.installing.wait"))
         progress.buttons[0].isEnabled = false
 
         // Show non-modal
@@ -999,13 +1085,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self?.mainController.window.endSheet(self?.mainController.window.attachedSheet ?? NSWindow())
                 if self?.ffmpegPath() != nil {
                     let ok = NSAlert()
-                    ok.messageText = "✓ ffmpeg instalado"
-                    ok.informativeText = "¡Listo! Ya podés importar y usar tus videos."
+                    ok.messageText = I18n.t("alert.ffmpeg.done.title")
+                    ok.informativeText = I18n.t("alert.ffmpeg.done.body")
                     ok.runModal()
                 } else {
                     let fail = NSAlert()
-                    fail.messageText = "No se pudo instalar ffmpeg"
-                    fail.informativeText = "Abrí Terminal y corré:\nbrew install ffmpeg"
+                    fail.messageText = I18n.t("alert.ffmpeg.failed.title")
+                    fail.informativeText = I18n.t("alert.ffmpeg.failed.body")
                     fail.alertStyle = .warning
                     fail.runModal()
                 }
@@ -1016,10 +1102,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func installHomebrew(then onReady: @escaping () -> Void) {
         let alert = NSAlert()
-        alert.messageText = "Se necesita Homebrew"
-        alert.informativeText = "Homebrew es el gestor de paquetes de macOS.\nSe va a abrir Terminal para instalarlo.\n\nDespués de instalar Homebrew, corré:\nbrew install ffmpeg"
-        alert.addButton(withTitle: "Abrir Terminal")
-        alert.addButton(withTitle: "Cancelar")
+        alert.messageText = I18n.t("alert.brew.title")
+        alert.informativeText = I18n.t("alert.brew.body")
+        alert.addButton(withTitle: I18n.t("alert.brew.open"))
+        alert.addButton(withTitle: I18n.t("common.cancel"))
 
         if alert.runModal() == .alertFirstButtonReturn {
             // Open Terminal with the Homebrew install script
@@ -1037,9 +1123,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let event = NSApp.currentEvent!
         if event.type == .rightMouseUp {
             let menu = NSMenu()
-            menu.addItem(NSMenuItem(title: "Abrir HUD", action: #selector(toggleWindow), keyEquivalent: ""))
-            
-            let pSave = NSMenuItem(title: "Ahorro de Energía (Modo estático)", action: #selector(togglePowerSaveMenu), keyEquivalent: "")
+            menu.addItem(NSMenuItem(title: I18n.t("menu.open"), action: #selector(toggleWindow), keyEquivalent: ""))
+
+            let pSave = NSMenuItem(title: I18n.t("menu.powersave"), action: #selector(togglePowerSaveMenu), keyEquivalent: "")
             let cfgPath = mainController.appSupportURL.appendingPathComponent("config.json").path
             if let data = try? Data(contentsOf: URL(fileURLWithPath: cfgPath)),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -1051,7 +1137,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             menu.addItem(pSave)
             
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(NSMenuItem(title: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+            menu.addItem(NSMenuItem(title: I18n.t("menu.quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
             
             statusItem.menu = menu
             statusItem.button?.performClick(nil)
@@ -1110,8 +1196,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 }
 
 // MARK: - Main
-let app = NSApplication.shared
-app.setActivationPolicy(.accessory)  // Start as menu bar only (no dock icon)
-let delegate = AppDelegate()
-app.delegate = delegate
-app.run()
+//
+// @main en vez de código top-level: el HUD ahora compila junto con
+// Localization.swift, y swiftc sólo permite expresiones sueltas en main.swift.
+@main
+enum WallpaperMenu {
+    static func main() {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)  // Start as menu bar only (no dock icon)
+        let delegate = AppDelegate()
+        app.delegate = delegate
+        app.run()
+    }
+}
