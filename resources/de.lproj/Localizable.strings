@@ -1,0 +1,74 @@
+/* Wallpaper Sync — Deutsch
+ *
+ * Fehlende Schlüssel fallen automatisch auf Englisch zurück
+ * (resources/en.lproj/Localizable.strings). Siehe docs/TRANSLATING.md.
+ *
+ * Erstübersetzung, nicht von Muttersprachlern geprüft — Korrekturen willkommen.
+ * Durchgehend informelle Anrede ("du"), wie in macOS.
+ */
+
+/* MARK: - Header */
+"header.title"                = "Mediathek";
+"header.search"               = "Hintergrundbilder suchen";
+"header.powersave"            = "Energiesparen";
+"header.import"               = "Importieren";
+"header.language"             = "Sprache";
+
+/* MARK: - Wallpaper card */
+"card.active"                 = "Aktiv";
+"card.delete"                 = "„%@“ löschen";
+
+/* MARK: - Status bar (bottom of the window) */
+"status.engine.running"       = "Engine läuft";
+"status.engine.stopped"       = "Engine gestoppt";
+/* Active video summary: name, width, height, size in MB, duration in seconds */
+"status.video"                = "▶ %@  ·  %d×%d  ·  HEVC  ·  %d MB  ·  %d s";
+"status.donate"               = "Spendier mir einen Kaffee · %@";
+"status.donate.label"         = "Spenden";
+
+/* MARK: - Empty library banner */
+"banner.empty.title"          = "Deine Mediathek ist leer";
+"banner.empty.body"           = "Importiere ein Video (.mp4, .mov, .gif), um es als animiertes Hintergrundbild zu verwenden.";
+"banner.empty.button"         = "Video importieren";
+
+/* MARK: - Lock screen setup overlay */
+"setup.title"                 = "Sperrbildschirm einrichten";
+"setup.subtitle"              = "Um das Video mit deinem Sperrbildschirm zu synchronisieren, benötigt macOS ein geladenes Aerial-Hintergrundbild.";
+"setup.step.1"                = "Öffne Systemeinstellungen → Hintergrundbild";
+"setup.step.2"                = "Suche ein animiertes Hintergrundbild (z. B. „Tahoe Day“)";
+"setup.step.3"                = "Klicke auf das Ladesymbol (☁︎)";
+"setup.step.4"                = "Aktiviere „Als Bildschirmschoner verwenden“";
+"setup.button"                = "Systemeinstellungen öffnen";
+
+/* MARK: - Import panel */
+"panel.import.title"          = "Videos zum Importieren auswählen";
+"panel.import.prompt"         = "Importieren";
+
+/* MARK: - Delete confirmation */
+"alert.delete.title"          = "„%@“ löschen?";
+"alert.delete.body"           = "Es wird aus deiner Mediathek entfernt.";
+"alert.delete.confirm"        = "Löschen";
+
+/* MARK: - ffmpeg / Homebrew setup */
+"alert.ffmpeg.title"          = "ffmpeg wird benötigt";
+"alert.ffmpeg.body"           = "Wallpaper Sync benötigt ffmpeg, um Videos zu konvertieren.\n\nSoll es automatisch installiert werden?";
+"alert.ffmpeg.install"        = "ffmpeg installieren";
+"alert.ffmpeg.later"          = "Später";
+"alert.ffmpeg.installing"     = "ffmpeg wird installiert…";
+"alert.ffmpeg.installing.body" = "Das kann ein paar Minuten dauern.\nSchließe dieses Fenster nicht.";
+"alert.ffmpeg.installing.wait" = "Bitte warten…";
+"alert.ffmpeg.done.title"     = "✓ ffmpeg installiert";
+"alert.ffmpeg.done.body"      = "Fertig! Du kannst jetzt deine Videos importieren und verwenden.";
+"alert.ffmpeg.failed.title"   = "ffmpeg konnte nicht installiert werden";
+"alert.ffmpeg.failed.body"    = "Öffne Terminal und führe aus:\nbrew install ffmpeg";
+"alert.brew.title"            = "Homebrew wird benötigt";
+"alert.brew.body"             = "Homebrew ist der Paketmanager für macOS.\nTerminal wird geöffnet, um es zu installieren.\n\nFühre nach der Installation von Homebrew aus:\nbrew install ffmpeg";
+"alert.brew.open"             = "Terminal öffnen";
+
+/* MARK: - Menu bar */
+"menu.open"                   = "HUD öffnen";
+"menu.powersave"              = "Energiesparen (Standbild)";
+"menu.quit"                   = "Beenden";
+
+/* MARK: - Shared */
+"common.cancel"               = "Abbrechen";

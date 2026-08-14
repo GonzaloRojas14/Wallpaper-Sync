@@ -1,0 +1,73 @@
+/* Wallpaper Sync — 日本語
+ *
+ * ここにないキーは自動的に英語にフォールバックします
+ * (resources/en.lproj/Localizable.strings)。docs/TRANSLATING.md を参照。
+ *
+ * 初回翻訳（ネイティブ未校正）— 修正歓迎です。
+ */
+
+/* MARK: - Header */
+"header.title"                = "ライブラリ";
+"header.search"               = "壁紙を検索";
+"header.powersave"            = "省エネ";
+"header.import"               = "読み込む";
+"header.language"             = "言語";
+
+/* MARK: - Wallpaper card */
+"card.active"                 = "使用中";
+"card.delete"                 = "「%@」を削除";
+
+/* MARK: - Status bar (bottom of the window) */
+"status.engine.running"       = "エンジン実行中";
+"status.engine.stopped"       = "エンジン停止中";
+/* Active video summary: name, width, height, size in MB, duration in seconds */
+"status.video"                = "▶ %@  ·  %d×%d  ·  HEVC  ·  %d MB  ·  %d 秒";
+"status.donate"               = "コーヒーをおごる · %@";
+"status.donate.label"         = "寄付";
+
+/* MARK: - Empty library banner */
+"banner.empty.title"          = "ライブラリが空です";
+"banner.empty.body"           = "動画（.mp4、.mov、.gif）を読み込むと、アニメーション壁紙として使えます。";
+"banner.empty.button"         = "動画を読み込む";
+
+/* MARK: - Lock screen setup overlay */
+"setup.title"                 = "ロック画面を設定";
+"setup.subtitle"              = "動画をロック画面と同期するには、ダウンロード済みの空撮壁紙が必要です。";
+"setup.step.1"                = "システム設定 →「壁紙」を開く";
+"setup.step.2"                = "アニメーション壁紙を探す（例：「Tahoe Day」）";
+"setup.step.3"                = "ダウンロードアイコン（☁︎）をクリック";
+"setup.step.4"                = "「スクリーンセーバとして表示」をオンにする";
+"setup.button"                = "システム設定を開く";
+
+/* MARK: - Import panel */
+"panel.import.title"          = "読み込む動画を選択";
+"panel.import.prompt"         = "読み込む";
+
+/* MARK: - Delete confirmation */
+"alert.delete.title"          = "「%@」を削除しますか？";
+"alert.delete.body"           = "ライブラリから削除されます。";
+"alert.delete.confirm"        = "削除";
+
+/* MARK: - ffmpeg / Homebrew setup */
+"alert.ffmpeg.title"          = "ffmpeg が必要です";
+"alert.ffmpeg.body"           = "Wallpaper Sync は動画の変換に ffmpeg を使用します。\n\n自動的にインストールしますか？";
+"alert.ffmpeg.install"        = "ffmpeg をインストール";
+"alert.ffmpeg.later"          = "あとで";
+"alert.ffmpeg.installing"     = "ffmpeg をインストール中…";
+"alert.ffmpeg.installing.body" = "数分かかることがあります。\nこのウインドウを閉じないでください。";
+"alert.ffmpeg.installing.wait" = "お待ちください…";
+"alert.ffmpeg.done.title"     = "✓ ffmpeg をインストールしました";
+"alert.ffmpeg.done.body"      = "準備完了です。動画を読み込んで使えます。";
+"alert.ffmpeg.failed.title"   = "ffmpeg をインストールできませんでした";
+"alert.ffmpeg.failed.body"    = "ターミナルを開いて次を実行してください：\nbrew install ffmpeg";
+"alert.brew.title"            = "Homebrew が必要です";
+"alert.brew.body"             = "Homebrew は macOS のパッケージマネージャです。\nインストールのためターミナルを開きます。\n\nHomebrew のインストール後、次を実行してください：\nbrew install ffmpeg";
+"alert.brew.open"             = "ターミナルを開く";
+
+/* MARK: - Menu bar */
+"menu.open"                   = "HUD を開く";
+"menu.powersave"              = "省エネ（静止画モード）";
+"menu.quit"                   = "終了";
+
+/* MARK: - Shared */
+"common.cancel"               = "キャンセル";

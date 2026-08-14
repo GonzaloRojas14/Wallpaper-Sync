@@ -1,0 +1,73 @@
+/* Wallpaper Sync — 简体中文
+ *
+ * 此处缺失的键会自动回退到英文
+ * (resources/en.lproj/Localizable.strings)。参见 docs/TRANSLATING.md。
+ *
+ * 初版翻译，未经母语者校对 — 欢迎修正。
+ */
+
+/* MARK: - Header */
+"header.title"                = "媒体库";
+"header.search"               = "搜索壁纸";
+"header.powersave"            = "节能";
+"header.import"               = "导入";
+"header.language"             = "语言";
+
+/* MARK: - Wallpaper card */
+"card.active"                 = "使用中";
+"card.delete"                 = "删除“%@”";
+
+/* MARK: - Status bar (bottom of the window) */
+"status.engine.running"       = "引擎运行中";
+"status.engine.stopped"       = "引擎已停止";
+/* Active video summary: name, width, height, size in MB, duration in seconds */
+"status.video"                = "▶ %@  ·  %d×%d  ·  HEVC  ·  %d MB  ·  %d 秒";
+"status.donate"               = "请我喝杯咖啡 · %@";
+"status.donate.label"         = "捐赠";
+
+/* MARK: - Empty library banner */
+"banner.empty.title"          = "媒体库为空";
+"banner.empty.body"           = "导入视频（.mp4、.mov、.gif）即可用作动态壁纸。";
+"banner.empty.button"         = "导入视频";
+
+/* MARK: - Lock screen setup overlay */
+"setup.title"                 = "设置锁定屏幕";
+"setup.subtitle"              = "要将视频同步到锁定屏幕，macOS 需要一个已下载的航拍壁纸。";
+"setup.step.1"                = "打开“系统设置”→“墙纸”";
+"setup.step.2"                = "找一个动态壁纸（例如“Tahoe Day”）";
+"setup.step.3"                = "点按下载图标（☁︎）";
+"setup.step.4"                = "打开“显示为屏幕保护程序”";
+"setup.button"                = "打开系统设置";
+
+/* MARK: - Import panel */
+"panel.import.title"          = "选择要导入的视频";
+"panel.import.prompt"         = "导入";
+
+/* MARK: - Delete confirmation */
+"alert.delete.title"          = "要删除“%@”吗？";
+"alert.delete.body"           = "它将从媒体库中移除。";
+"alert.delete.confirm"        = "删除";
+
+/* MARK: - ffmpeg / Homebrew setup */
+"alert.ffmpeg.title"          = "需要 ffmpeg";
+"alert.ffmpeg.body"           = "Wallpaper Sync 需要 ffmpeg 来转换视频。\n\n要自动安装吗？";
+"alert.ffmpeg.install"        = "安装 ffmpeg";
+"alert.ffmpeg.later"          = "以后再说";
+"alert.ffmpeg.installing"     = "正在安装 ffmpeg…";
+"alert.ffmpeg.installing.body" = "这可能需要几分钟。\n请不要关闭此窗口。";
+"alert.ffmpeg.installing.wait" = "请稍候…";
+"alert.ffmpeg.done.title"     = "✓ ffmpeg 已安装";
+"alert.ffmpeg.done.body"      = "完成！现在可以导入并使用你的视频了。";
+"alert.ffmpeg.failed.title"   = "无法安装 ffmpeg";
+"alert.ffmpeg.failed.body"    = "请打开“终端”并运行：\nbrew install ffmpeg";
+"alert.brew.title"            = "需要 Homebrew";
+"alert.brew.body"             = "Homebrew 是 macOS 的软件包管理器。\n将打开“终端”以进行安装。\n\n安装 Homebrew 后，请运行：\nbrew install ffmpeg";
+"alert.brew.open"             = "打开终端";
+
+/* MARK: - Menu bar */
+"menu.open"                   = "打开 HUD";
+"menu.powersave"              = "节能（静止画面）";
+"menu.quit"                   = "退出";
+
+/* MARK: - Shared */
+"common.cancel"               = "取消";

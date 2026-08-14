@@ -25,7 +25,7 @@
 - 🎨 **Native UI** — Liquid-Glass HUD with live search, hover-lift cards, light/dark adaptive
 - 📦 **Menu bar app** — Runs silently in the background, no dock clutter
 - 🛠️ **Auto-setup** — Installs ffmpeg dependency automatically if needed
-- 🌍 **Multi-language** — English and Spanish, follows your system language, [easy to extend](docs/TRANSLATING.md)
+- 🌍 **Six languages** — English, Spanish, French, German, Japanese, 简体中文 — follows your system language, [easy to extend](docs/TRANSLATING.md)
 - 🌗 **macOS Tahoe ready** — Uses semantic system colors and `NSVisualEffectView` materials
 
 ## Why Wallpaper Sync?
@@ -126,16 +126,21 @@ wallpaper status              # Show current config
 
 ### Languages
 
-Available in **English** and **Spanish**. Both the app and the CLI follow your macOS
-language automatically; the globe menu in the HUD header overrides it and the CLI picks
-up the same choice.
+| | | | | | |
+|---|---|---|---|---|---|
+| English | Español | Français | Deutsch | 日本語 | 简体中文 |
+
+Both the app and the CLI follow your macOS language automatically; the globe menu in
+the HUD header overrides it and the CLI picks up the same choice.
 
 ```bash
-WALLPAPER_LANG=es wallpaper status   # override for a single command
+WALLPAPER_LANG=ja wallpaper status   # override for a single command
 ```
 
 Adding a language means dropping in two files and no code — see
-**[docs/TRANSLATING.md](docs/TRANSLATING.md)**. Translations welcome.
+**[docs/TRANSLATING.md](docs/TRANSLATING.md)**. Translations welcome, and corrections
+especially: everything past English and Spanish is a first pass that hasn't been
+reviewed by a native speaker.
 
 ## How It Works
 

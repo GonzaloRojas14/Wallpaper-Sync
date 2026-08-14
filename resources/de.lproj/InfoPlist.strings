@@ -1,0 +1,4 @@
+/* Bundle metadata — overrides the matching keys in app/Info.plist */
+
+"CFBundleDisplayName"      = "Wallpaper Sync";
+"NSHumanReadableCopyright" = "© 2026 Gonzalo Rojas. Veröffentlicht unter der MIT-Lizenz.";

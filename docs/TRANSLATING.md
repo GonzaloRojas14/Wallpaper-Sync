@@ -1,25 +1,39 @@
 # Translating Wallpaper Sync
 
-Wallpaper Sync ships in **English** (the development language) and **Spanish**.
-Adding another one takes two files and no code changes.
+Wallpaper Sync ships in six languages:
+
+| Code | Language | |
+|---|---|---|
+| `en` | English | development language, always complete |
+| `es` | Español | by the original author |
+| `fr` | Français | first pass, unreviewed |
+| `de` | Deutsch | first pass, unreviewed |
+| `ja` | 日本語 | first pass, unreviewed |
+| `zh-Hans` | 简体中文 | first pass, unreviewed |
+
+Adding another takes two files and no code changes. **Corrections to the unreviewed
+ones are just as welcome as new languages** — they were translated in one pass without
+a native speaker's review, so wording is likely to be stiff in places.
 
 ## The short version
 
-Say you want French (`fr`). Copy the English catalogs, translate the values, done:
+Say you want Portuguese (`pt`). Copy the English catalogs, translate the values, done:
 
 ```bash
-cp -R resources/en.lproj resources/fr.lproj   # the menu-bar app
-cp bin/i18n/en.sh bin/i18n/fr.sh              # the command line tool
+cp -R resources/en.lproj resources/pt.lproj   # the menu-bar app
+cp bin/i18n/en.sh bin/i18n/pt.sh              # the command line tool
 ./install.sh
 ```
 
-The app finds `fr.lproj` on its own and adds **Français** to the globe menu in the
+The app finds `pt.lproj` on its own and adds **Português** to the globe menu in the
 header — the language list is built by scanning the bundle, so there is no list of
 languages to register anywhere.
 
 Use the [ISO 639-1 code](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes)
-for the language (`fr`, `de`, `pt`, `ja`). Codes are per language, not per region:
-a Mac set to `pt-BR` loads `pt`.
+for the language (`pt`, `it`, `ko`, `ru`). Add a script or region subtag only when the
+language genuinely needs one — `zh-Hans` vs `zh-Hant` does, most don't. Lookup walks
+from most to least specific, so a Mac set to `pt-BR` will use `pt-BR` if it exists and
+otherwise fall back to `pt`.
 
 ## What goes where
 
@@ -65,7 +79,7 @@ line the output up into a column. Adjust the spacing so your text still lines up
 The CLI takes an override:
 
 ```bash
-WALLPAPER_LANG=fr bin/wallpaper help
+WALLPAPER_LANG=pt bin/wallpaper help
 ```
 
 The app has the globe menu in the header. Your choice is written to the `language` key
