@@ -18,8 +18,11 @@
     <string>2.1</string>
     <key>CFBundleGetInfoString</key>
     <string>Wallpaper Sync 2.1, © 2026 Gonzalo Rojas</string>
+    <!-- Traducido en resources/<código>.lproj/InfoPlist.strings -->
     <key>NSHumanReadableCopyright</key>
-    <string>© 2026 Gonzalo Rojas. Liberado bajo licencia MIT.</string>
+    <string>© 2026 Gonzalo Rojas. Released under the MIT license.</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>NSHighResolutionCapable</key>
