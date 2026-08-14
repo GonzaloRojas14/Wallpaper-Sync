@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Reemplaza un aerial descargado del sistema con el video del usuario.
-El video que recibe YA DEBE estar en formato HEVC (.mov con tag hvc1).
-Solo hace una copia atómica — sin re-codificación.
+Replaces a downloaded system aerial with the user's video.
+The video passed in MUST already be HEVC (.mov tagged hvc1).
+This only does an atomic copy — no re-encoding.
 
-Uso:
-    _set_lockscreen_video.py <video.mov>       # instala
-    _set_lockscreen_video.py --restore         # restaura el aerial original
-    _set_lockscreen_video.py --status          # muestra el estado
+Usage:
+    _set_lockscreen_video.py <video.mov>       # install
+    _set_lockscreen_video.py --restore         # restore the original aerial
+    _set_lockscreen_video.py --status          # show current state
 """
 import os, sys, json, shutil, subprocess, datetime, plistlib, time
 
@@ -40,7 +40,7 @@ def info(msg):
 
 
 def find_downloaded_aerials():
-    """Busca aerials descargados (.mov) en el directorio del sistema."""
+    """Find downloaded aerials (.mov) in the system directory."""
     if not os.path.isdir(AERIALS_DIR):
         return []
     results = []
@@ -64,7 +64,7 @@ def load_manifest():
 
 
 def atomic_copy(src, dst):
-    """Copia el video forzando un nuevo inodo para que macOS no use caché viejo."""
+    """Copy the video onto a fresh inode so macOS can't serve a stale cache."""
     tmp = dst + ".tmp"
     shutil.copy2(src, tmp)
     if os.path.exists(dst):
@@ -73,25 +73,25 @@ def atomic_copy(src, dst):
 
 
 def update_cold_boot_poster(video_path):
-    """Genera una imagen estática del video y la guarda en la caché del login screen.
-    Devuelve True si el poster se regeneró correctamente.
+    """Generate a still image from the video and store it in the login screen cache.
+    Returns True if the poster was regenerated successfully.
     """
     user = os.environ.get("USER")
     if not user:
-        info("warning: $USER no está seteado, omito poster")
+        info("warning: $USER is not set, skipping poster")
         _log_to_file("poster: $USER missing")
         return False
 
     res = subprocess.run(["dscl", ".", "-read", f"/Users/{user}", "GeneratedUID"],
                          capture_output=True, text=True)
     if res.returncode != 0:
-        info(f"warning: dscl falló ({res.returncode}): {res.stderr.strip()}")
+        info(f"warning: dscl failed ({res.returncode}): {res.stderr.strip()}")
         _log_to_file(f"poster: dscl failed rc={res.returncode} stderr={res.stderr.strip()}")
         return False
 
     uuid = res.stdout.split()[-1].strip()
     if not uuid:
-        info("warning: dscl no devolvió UUID")
+        info("warning: dscl returned no UUID")
         _log_to_file("poster: empty UUID")
         return False
 
@@ -99,7 +99,7 @@ def update_cold_boot_poster(video_path):
     try:
         os.makedirs(cache_dir, exist_ok=True)
     except OSError as e:
-        info(f"warning: no se pudo crear cache dir: {e}")
+        info(f"warning: could not create cache dir: {e}")
         _log_to_file(f"poster: makedirs failed: {e}")
         return False
 
@@ -109,11 +109,11 @@ def update_cold_boot_poster(video_path):
 
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
-        info("warning: ffmpeg no está en PATH, omito poster")
+        info("warning: ffmpeg is not on PATH, skipping poster")
         _log_to_file("poster: ffmpeg not found in PATH")
         return False
 
-    info("generando poster para arranque en frío…")
+    info("generating poster for cold boot…")
     # Escribir a un .tmp y luego renombrar — atómico, evita posters corruptos
     res = subprocess.run(
         [ffmpeg, "-y", "-loglevel", "error", "-i", video_path,
@@ -121,7 +121,7 @@ def update_cold_boot_poster(video_path):
         capture_output=True, text=True
     )
     if res.returncode != 0:
-        info(f"warning: ffmpeg falló (rc={res.returncode})")
+        info(f"warning: ffmpeg failed (rc={res.returncode})")
         _log_to_file(f"poster: ffmpeg rc={res.returncode} stderr={res.stderr.strip()}")
         try: os.unlink(tmp_png)
         except OSError: pass
@@ -132,7 +132,7 @@ def update_cold_boot_poster(video_path):
     except OSError:
         size = 0
     if size <= 0:
-        info("warning: ffmpeg no escribió ningún byte")
+        info("warning: ffmpeg wrote no bytes")
         _log_to_file("poster: tmp file empty")
         try: os.unlink(tmp_png)
         except OSError: pass
@@ -141,7 +141,7 @@ def update_cold_boot_poster(video_path):
     try:
         os.replace(tmp_png, lockscreen_png)
     except OSError as e:
-        info(f"warning: no se pudo renombrar el poster: {e}")
+        info(f"warning: could not rename the poster: {e}")
         _log_to_file(f"poster: rename failed: {e}")
         try: os.unlink(tmp_png)
         except OSError: pass
@@ -151,21 +151,21 @@ def update_cold_boot_poster(video_path):
     try:
         st = os.stat(lockscreen_png)
         if st.st_size != size or (time.time() - st.st_mtime) > 60:
-            info("warning: el poster final no quedó actualizado")
+            info("warning: the final poster was not updated")
             _log_to_file(f"poster: post-check failed size={st.st_size} expected={size} mtime_age={time.time()-st.st_mtime:.0f}s")
             return False
     except OSError as e:
         _log_to_file(f"poster: final stat failed: {e}")
         return False
 
-    info(f"✓ poster regenerado ({size//1024} KB)")
+    info(f"✓ poster regenerated ({size//1024} KB)")
     _log_to_file(f"poster: ok {size} bytes -> {lockscreen_png}")
     return True
 
 
 def restart_wallpaper_agent():
-    """Reinicia los procesos de macOS para que recarguen el nuevo video."""
-    info("recargando procesos del sistema…")
+    """Restart the macOS processes so they reload the new video."""
+    info("reloading system processes…")
     subprocess.run(["killall", "WallpaperAgent", "WallpaperAerialsExtension"],
                    stderr=subprocess.DEVNULL)
 
@@ -176,7 +176,7 @@ INDEX_PLIST = os.path.expanduser("~/Library/Application Support/com.apple.wallpa
 def configure_idle_plist(aerial_id):
     """Write the selectedID into Index.plist so macOS knows which aerial to show on lock screen."""
     if not os.path.exists(INDEX_PLIST):
-        info("Index.plist no encontrado, omitiendo configuración")
+        info("Index.plist not found, skipping configuration")
         return
 
     try:
@@ -202,9 +202,9 @@ def configure_idle_plist(aerial_id):
         # Forzar un cambio de timestamp para que macOS note que el archivo cambió
         os.utime(INDEX_PLIST, None)
 
-        info(f"configurado aerial {aerial_id} en Index.plist")
+        info(f"set aerial {aerial_id} in Index.plist")
     except Exception as e:
-        info(f"warning: no se pudo actualizar Index.plist: {e}")
+        info(f"warning: could not update Index.plist: {e}")
 
 
 def save_state(aerial_path, original_backup):
@@ -226,15 +226,15 @@ def load_state():
 
 
 def cmd_install(video_path):
-    """Instala un video HEVC como lock screen wallpaper."""
+    """Install an HEVC video as the lock screen wallpaper."""
     if not os.path.exists(video_path):
-        die(f"no existe: {video_path}")
+        die(f"does not exist: {video_path}")
 
     aerials = find_downloaded_aerials()
     if not aerials:
         die(
-            "no hay aerials descargados. Abrí Configuración del Sistema → Fondo de Pantalla,\n"
-            "   descargá uno de los fondos animados (ej: 'Tahoe Day'), y volvé a intentar."
+            "no downloaded aerials found. Open System Settings → Wallpaper,\n"
+            "   download one of the animated wallpapers (e.g. 'Tahoe Day'), and try again."
         )
 
     manifest = load_manifest()
@@ -244,18 +244,18 @@ def cmd_install(video_path):
     aerial_id = get_aerial_id_from_path(aerial_path)
     aerial_name = manifest.get(aerial_id, {}).get("accessibilityLabel", aerial_id)
 
-    info(f"usando aerial slot: {aerial_name} ({aerial_id})")
+    info(f"using aerial slot: {aerial_name} ({aerial_id})")
 
     # Backup del original si no existe ya
     backup_path = aerial_path + BACKUP_SUFFIX
     if not os.path.exists(backup_path):
-        info(f"guardando backup del original → {os.path.basename(backup_path)}")
+        info(f"backing up the original → {os.path.basename(backup_path)}")
         shutil.copy2(aerial_path, backup_path)
     else:
-        info("backup del original ya existe")
+        info("backup of the original already exists")
 
     # Copia atómica — el video YA está en HEVC, no hay conversión
-    info("copiando video al slot del sistema…")
+    info("copying video into the system slot…")
     atomic_copy(video_path, aerial_path)
 
     # Ensure macOS Index.plist points to this aerial for the Idle (lock screen)
@@ -269,27 +269,27 @@ def cmd_install(video_path):
     if not poster_ok:
         _log_to_file(f"install: poster regeneration failed for {video_path}")
 
-    info("✓ lock screen actualizado" + ("" if poster_ok else " (poster con warnings — ver engine.log)"))
+    info("✓ lock screen updated" + ("" if poster_ok else " (poster had warnings — see engine.log)"))
 
 
 def cmd_restore():
     state = load_state()
     if not state:
-        die("no hay estado guardado para restaurar")
+        die("no saved state to restore")
 
     aerial_path = state["aerial_path"]
     backup_path = state["original_backup"]
 
     if not os.path.exists(backup_path):
-        die(f"no existe el backup: {backup_path}")
+        die(f"backup does not exist: {backup_path}")
 
     # Sanidad: backup razonablemente grande y reconocible como video por ffprobe
     try:
         backup_size = os.path.getsize(backup_path)
     except OSError as e:
-        die(f"no se puede leer el backup: {e}")
+        die(f"cannot read the backup: {e}")
     if backup_size < 64 * 1024:
-        die(f"backup parece corrupto o truncado ({backup_size} bytes)")
+        die(f"backup looks corrupt or truncated ({backup_size} bytes)")
 
     ffprobe = shutil.which("ffprobe")
     if ffprobe:
@@ -299,10 +299,10 @@ def cmd_restore():
             capture_output=True, text=True
         )
         if res.returncode != 0 or not res.stdout.strip():
-            die(f"backup no parece un video válido (ffprobe: {res.stderr.strip() or 'sin stream'})")
+            die(f"backup does not look like a valid video (ffprobe: {res.stderr.strip() or 'no stream'})")
 
     # Copia atómica al slot
-    info("restaurando aerial original…")
+    info("restoring the original aerial…")
     tmp = aerial_path + ".restore.tmp"
     try:
         shutil.copy2(backup_path, tmp)
@@ -310,14 +310,14 @@ def cmd_restore():
     except OSError as e:
         try: os.unlink(tmp)
         except OSError: pass
-        die(f"no se pudo restaurar: {e}")
+        die(f"could not restore: {e}")
 
     restart_wallpaper_agent()
     try:
         os.unlink(STATE_FILE)
     except OSError:
         pass
-    info("✓ aerial original restaurado")
+    info("✓ original aerial restored")
 
 
 def cmd_status():
@@ -325,7 +325,7 @@ def cmd_status():
     aerials = find_downloaded_aerials()
     manifest = load_manifest()
 
-    print(f"aerials descargados: {len(aerials)}")
+    print(f"downloaded aerials: {len(aerials)}")
     for a in aerials:
         aid = get_aerial_id_from_path(a)
         name = manifest.get(aid, {}).get("accessibilityLabel", "desconocido")
@@ -335,9 +335,9 @@ def cmd_status():
         print(f"  {name} ({aid}) — {size_mb:.0f} MB{status}")
 
     if state:
-        print(f"\nestado: video custom instalado ({state['timestamp']})")
+        print(f"\nstate: custom video installed ({state['timestamp']})")
     else:
-        print(f"\nestado: usando aerial original del sistema")
+        print(f"\nstate: using the original system aerial")
 
 
 def main():

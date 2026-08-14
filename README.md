@@ -25,6 +25,7 @@
 - 🎨 **Native UI** — Liquid-Glass HUD with live search, hover-lift cards, light/dark adaptive
 - 📦 **Menu bar app** — Runs silently in the background, no dock clutter
 - 🛠️ **Auto-setup** — Installs ffmpeg dependency automatically if needed
+- 🌍 **Multi-language** — English and Spanish, follows your system language, [easy to extend](docs/TRANSLATING.md)
 - 🌗 **macOS Tahoe ready** — Uses semantic system colors and `NSVisualEffectView` materials
 
 ## Why Wallpaper Sync?
@@ -109,7 +110,7 @@ bin/wallpaper set your-video.mp4
 ## Usage
 
 ### GUI
-Click the **▶︎** icon in the menu bar to open the wallpaper gallery. Click any thumbnail to activate it. The HUD has a live search field, a "Power Save" switch, and quick links to my Instagram and donations in the bottom-right corner.
+Click the **▶︎** icon in the menu bar to open the wallpaper gallery. Click any thumbnail to activate it. The HUD has a live search field, a "Power Save" switch, a language menu, and quick links to my Instagram and donations in the bottom-right corner.
 
 ### CLI
 ```bash
@@ -122,6 +123,19 @@ wallpaper start | stop        # Control the engine
 wallpaper battery on|off      # Auto-pause on battery
 wallpaper status              # Show current config
 ```
+
+### Languages
+
+Available in **English** and **Spanish**. Both the app and the CLI follow your macOS
+language automatically; the globe menu in the HUD header overrides it and the CLI picks
+up the same choice.
+
+```bash
+WALLPAPER_LANG=es wallpaper status   # override for a single command
+```
+
+Adding a language means dropping in two files and no code — see
+**[docs/TRANSLATING.md](docs/TRANSLATING.md)**. Translations welcome.
 
 ## How It Works
 

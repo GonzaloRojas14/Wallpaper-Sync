@@ -6,6 +6,7 @@
 # Build artifacts
 app/WallpaperEngine
 app/WallpaperMenu
+app/*.lproj/
 Wallpaper Sync.app/
 
 # User data (these live in ~/Library/Application Support/WallpaperSync/)
@@ -22,3 +23,4 @@ config.json
 *.dmg
 *.zip
 dmg_staging/
+__pycache__/
