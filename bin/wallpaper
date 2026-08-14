@@ -82,14 +82,28 @@ detect_lang() {
   fi
 
   [ -n "$code" ] || code="${LANG:-}"
-  code="${code%%_*}"   # es_AR.UTF-8 → es
-  code="${code%%-*}"   # en-GB       → en (los catálogos son por idioma)
-  echo "${code:-en}"
+  code="${code%%.*}"      # es_AR.UTF-8 → es_AR
+  echo "${code//_/-}"     # es_AR       → es-AR
+}
+
+# Del código más específico al más general, hasta encontrar un catálogo:
+# zh-Hans-CN → zh-Hans → zh → en. Sin esto, el chino simplificado
+# (zh-Hans) colapsaría a "zh" y no encontraría su archivo.
+resolve_catalog() {
+  local code="$1"
+  while [ -n "$code" ]; do
+    if [ -f "$BUNDLE_ROOT/bin/i18n/${code}.sh" ]; then
+      echo "$code"; return 0
+    fi
+    [ "$code" = "${code%-*}" ] && break
+    code="${code%-*}"
+  done
+  echo en
 }
 
 . "$BUNDLE_ROOT/bin/i18n/en.sh"
-LANG_CODE="$(detect_lang)"
-if [ "$LANG_CODE" != "en" ] && [ -f "$BUNDLE_ROOT/bin/i18n/${LANG_CODE}.sh" ]; then
+LANG_CODE="$(resolve_catalog "$(detect_lang)")"
+if [ "$LANG_CODE" != "en" ]; then
   . "$BUNDLE_ROOT/bin/i18n/${LANG_CODE}.sh"
 fi
 

@@ -64,9 +64,19 @@ enum I18n {
 
     private static var fallbackBundle: Bundle? { bundle(for: fallbackCode) }
 
+    /// Del código más específico al más general: zh-Hans-CN → zh-Hans → zh.
+    /// El picker siempre guarda un código exacto, pero un config.json editado
+    /// a mano puede traer una variante regional.
     private static func bundle(for code: String) -> Bundle? {
-        guard let path = Bundle.main.path(forResource: code, ofType: "lproj") else { return nil }
-        return Bundle(path: path)
+        var code = code
+        while !code.isEmpty {
+            if let path = Bundle.main.path(forResource: code, ofType: "lproj") {
+                return Bundle(path: path)
+            }
+            guard let cut = code.lastIndex(of: "-") else { return nil }
+            code = String(code[code.startIndex..<cut])
+        }
+        return nil
     }
 
     // MARK: Available languages
